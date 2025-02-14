@@ -13,7 +13,7 @@ TOPVIEWRODENTS_CONFIG = {'name': 'TopViewRodents', 'kpts': {'nose': 0, 'right_ea
                         'features': ['position', 'bbox', 'angles', 'distance', 'speed'],
                         #'features': ['position', 'distance'],
                         'angle_pairs': TOPVIEWRODENTS_SPINE_ANGLES,
-                        'crop_features': True,
+                        'crop_features': False,
                         'img_features': 'img_features'}
 
 W_SIZE = 16

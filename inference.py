@@ -11,8 +11,7 @@ import time
 
 
 inf = Inferencer(TOPVIEWRODENTS_CONFIG)
-inf('walking/videos/walking_22.mp4', 32)
-
+inf('/home/techtrans2/RAT_DATASETS/LAB_RAT_ACTIONS_DATASET/body_cleaning/videos/body_cleaning_22.mp4', 16)
 
 # inferencer = DetInferencer(model='/home/techtrans2/mmdetection/work_dirs/rtmdet_s_8xb32-300e_ratdataset/rtmdet_s_8xb32-300e_ratdataset.py', 
 #                            weights='/home/techtrans2/mmdetection/work_dirs/rtmdet_s_8xb32-300e_ratdataset/epoch_200.pth', device='cuda')

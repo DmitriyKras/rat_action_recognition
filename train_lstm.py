@@ -12,15 +12,15 @@ from math import ceil
 from torchmetrics import Precision, Recall, AveragePrecision, Accuracy
 
 
-BATCH_SIZE = 512
+BATCH_SIZE = 128
 EPOCHS = 50
 LR = 10e-4
 ds_config = TOPVIEWRODENTS_CONFIG
 
 
-train_ds = ConcatDataset([LSTMDataset('lstm_dataset', 'train', cl) for cl in ds_config['classes']])
+train_ds = ConcatDataset([LSTMDataset(ds_config, 'train', cl, augment=True) for cl in ds_config['classes']])
 train_dl = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
-val_ds = ConcatDataset([LSTMDataset('lstm_dataset', 'val', cl) for cl in ds_config['classes']])
+val_ds = ConcatDataset([LSTMDataset(ds_config, 'val', cl) for cl in ds_config['classes']])
 val_dl = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=2)
 train_steps = ceil(len(train_ds) / BATCH_SIZE)  # number of train and val steps
 val_steps = ceil(len(val_ds) / BATCH_SIZE)
@@ -29,7 +29,7 @@ print(f"Total samples in train dataset: {len(train_ds)}")
 print(f"Total samples in val dataset: {len(val_ds)}")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # get cuda device
-model = LSTMClassifier(542, 128, len(ds_config['classes'])).to(device)
+model = LSTMClassifier(30, 128, len(ds_config['classes'])).to(device)
 #model = MultiLayerBiLSTMClassifier(2078, 256, 2, len(ds_config['classes'])).to(device)
 optimizer = Adam(model.parameters(), lr=LR)
 scheduler = ExponentialLR(optimizer, gamma=0.9)

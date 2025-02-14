@@ -227,10 +227,11 @@ class DatasetGeneratorLSTM:
         os.makedirs(f"{root_path}/{save_folder}/train", exist_ok=True)
         os.makedirs(f"{root_path}/{save_folder}/val", exist_ok=True)
         for id, cl in tqdm(enumerate(class_names), total=len(class_names)):
-            data = []
             label_list = sorted(os.listdir(f"{root_path}/{cl}/{labels_path}/"))  # get txt paths of saved labels
             feature_list = sorted(os.listdir(f"{root_path}/{cl}/{img_features}/"))  # get txt paths of saved img features
-            for l_path, f_path in tqdm(zip(label_list, feature_list), total=len(label_list)):
+            train_labels, val_labels, train_feature_list, val_feature_list = train_test_split(label_list, feature_list, test_size=0.2)
+            data = []
+            for l_path, f_path in tqdm(zip(train_labels, train_feature_list), total=len(label_list)):
                 label, _ = read_label(f"{root_path}/{cl}/{labels_path}/{l_path}")  # read label as np.ndarray
                 label = labels2kpts(label, self.n_kpts, 'bbox' in self.features)  # strip frame number and kpts scores
                 if self.ds_config['crop_features']:
@@ -247,6 +248,21 @@ class DatasetGeneratorLSTM:
                     data.append(np.round(f_vector, 4))
 
             data = np.array(data)
-            train_d, val_d = train_test_split(data, test_size=0.2)
-            np.save(f"{root_path}/{save_folder}/train/{cl}.npy", train_d)
-            np.save(f"{root_path}/{save_folder}/val/{cl}.npy", val_d)
+            np.save(f"{root_path}/{save_folder}/train/{cl}.npy", data)
+            data = []
+            for l_path, f_path in tqdm(zip(val_labels, val_feature_list), total=len(label_list)):
+                label, _ = read_label(f"{root_path}/{cl}/{labels_path}/{l_path}")  # read label as np.ndarray
+                label = labels2kpts(label, self.n_kpts, 'bbox' in self.features)  # strip frame number and kpts scores
+                if self.ds_config['crop_features']:
+                    img_f = read_feature(f"{root_path}/{cl}/{img_features}/{f_path}")  # read features as np.ndarray
+                n_frames = label.shape[0]  # total number of frames
+                step = floor((1 - overlap) * w_size)  # step of the sliding window
+                n_steps = (n_frames - w_size) // step  + 1  # number of steps for label
+                for i in range(n_steps):
+                    f_vector = self.feature_matrix(label[i * step : i * step + w_size].copy())  # build f vector from kpts
+                    if self.ds_config['crop_features']:
+                        f_vector = np.concatenate((f_vector,
+                                                   img_f[i * step : i * step + w_size].copy()), axis=1)
+                    f_vector = np.concatenate((f_vector, np.ones((f_vector.shape[0], 1)) * id), axis=1)
+                    data.append(np.round(f_vector, 4))
+            np.save(f"{root_path}/{save_folder}/val/{cl}.npy", data)
