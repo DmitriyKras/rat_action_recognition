@@ -1,14 +1,21 @@
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, ConcatDataset
 import numpy as np
-from typing import List, Dict
+from typing import List, Dict, Tuple, Literal
 import os
 from tqdm import tqdm
+from math import floor
+import cv2
+from sklearn.model_selection import train_test_split
+import albumentations as A
 from .augmentation import KeypointsAugmentor
+from .utils import read_label
+
 
 
 class LSTMDataset(Dataset):
     def __init__(self, config: Dict, subset: str, cl: str, augment: bool = False):
+        super().__init__()
         self.config = config
         self.root = config['root'] + '/lstm_dataset'
         self.subset = subset
@@ -29,3 +36,82 @@ class LSTMDataset(Dataset):
         if self.augment:
             X = self.augmentor.augment(X)
         return X.float(), y.long()
+    
+
+### Dataset for one video file
+class Conv3DDataset(Dataset):
+    def __init__(self, video_path: str, label_path: int, input_shape: Tuple[int, int], cl: int, 
+                 w_size: int, overlap: float = 0, offset: int = 0, augment: bool = False):
+        super().__init__()
+        self.w_size = w_size
+        self.video_path = video_path
+        self.cl = torch.tensor(cl)
+        self.input_shape = input_shape
+        self.offset = offset
+        self.augment = augment
+        self.labels, wh = read_label(label_path)
+        self.labels = (self.labels[:, 1 : 5] * np.array(wh * 2)).astype(int)  # extract xyxy coordinates of bbox on every frame
+        n_frames = self.labels.shape[0] - 2 * offset  # total number of frames to be used
+        self.step = floor((1 - overlap) * w_size)  # step of the sliding window
+        self.n_steps = (n_frames - w_size) // self.step + 1 # number of steps for video
+        self.wh = wh  # save image width, height
+        # self.transform = A.Compose([
+        #     A.HorizontalFlip(p=0.5),
+        #     A.VerticalFlip(p=0.5)
+        # ], p=0.5)
+
+    def __read_frames(self, idx) -> List[np.ndarray]:
+        n = idx * self.step + self.offset
+        cap = cv2.VideoCapture(self.video_path)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, n)  # set pointer to frame
+        frames = []
+        # Extract specific frames and ROIs
+        for i in range(self.w_size):
+            _, frame = cap.read()
+            x1, y1, x2, y2 = self.labels[n + i, :]
+            w, h = x2 - x1, y2 - y1
+            x1, x2 = max(0, int(x1 - w * 0.2)), min(self.wh[0], int(x2 + w * 0.2))
+            y1, y2 = max(0, int(y1 - h * 0.2)), min(self.wh[1], int(y2 + h * 0.2))
+            frames.append(cv2.cvtColor(cv2.resize(frame[y1 : y2, x1 : x2, :], self.input_shape), cv2.COLOR_BGR2RGB))
+        cap.release()
+        return frames
+
+    def __len__(self) -> int:
+        return self.n_steps
+
+    def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+        
+        frames = self.__read_frames(idx)
+        # if self.augment:
+        #     transformed = self.transform(images=frames)
+        #     frames = transformed['images']
+        frames = np.array(frames)
+
+        frames = torch.from_numpy(frames) / 255
+        return torch.permute(frames.float(), (3, 0, 1, 2)), self.cl
+        #return frames, self.cl
+
+
+def build_conv3d_dataset(config: Dict, input_shape: Tuple[int, int],
+                         w_size: int, overlap: float = 0, offset: int = 0) -> Tuple[ConcatDataset, ConcatDataset]:
+    root = config['root']
+    videos = config['videos']
+    labels = config['labels']
+    classes = config['classes']
+    train_ds, val_ds = [], []
+    for cl_id, cl in enumerate(classes):
+        v_dir = f"{root}/{cl}/{videos}"
+        l_dir = f"{root}/{cl}/{labels}"
+        videos_list = sorted(os.listdir(v_dir))
+        labels_list = sorted(os.listdir(l_dir))
+        train_videos, val_videos, train_labels, val_labels = train_test_split(videos_list, labels_list, test_size=0.2)
+        print(f"Number of videos in train set of class {cl_id}: {cl} is {len(train_videos)}")
+        print(f"Number of videos in val set of class {cl_id}: {cl} is {len(val_videos)}")
+        train_ds.extend([Conv3DDataset(f"{v_dir}/{vid}", f"{l_dir}/{label}", input_shape, cl_id, w_size, overlap, offset) 
+                         for vid, label in zip(train_videos, train_labels)])
+        val_ds.extend([Conv3DDataset(f"{v_dir}/{vid}", f"{l_dir}/{label}", input_shape, cl_id, w_size, overlap, offset) 
+                         for vid, label in zip(val_videos, val_labels)])
+    
+    return ConcatDataset(train_ds), ConcatDataset(val_ds)

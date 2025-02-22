@@ -3,3 +3,5 @@ lstm_dataset
 *.pt
 *.npy
 *.pkl
+*.pth
+*.ipynb

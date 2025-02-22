@@ -1,8 +1,6 @@
+import cv2
 import torch
-from torch.utils.data import ConcatDataset, DataLoader
-from utils import LSTMDataset, EarlyStopping 
-from models import MultiLayerBiLSTMClassifier, LSTMClassifier
-from configs import TOPVIEWRODENTS_CONFIG
+from torch.utils.data import DataLoader
 from torch import nn
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
@@ -10,27 +8,40 @@ from tqdm import tqdm
 import time
 from math import ceil
 from torchmetrics import Precision, Recall, AveragePrecision, Accuracy
+from utils import build_conv3d_dataset, EarlyStopping
+from configs import TOPVIEWRODENTS_CONFIG
+from models import resnet3d
+from torchsummary import summary
 
 
-BATCH_SIZE = 128
-EPOCHS = 50
+BATCH_SIZE = 8
+EPOCHS = 10
 LR = 10e-4
 ds_config = TOPVIEWRODENTS_CONFIG
 
 
-train_ds = ConcatDataset([LSTMDataset(ds_config, 'train', cl, augment=True) for cl in ds_config['classes']])
-train_dl = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
-val_ds = ConcatDataset([LSTMDataset(ds_config, 'val', cl) for cl in ds_config['classes']])
-val_dl = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=2)
+train_ds, val_ds = build_conv3d_dataset(ds_config, 
+                                        input_shape=(256, 256), 
+                                        w_size=32, 
+                                        overlap=0, 
+                                        offset=10)
+
+train_dl = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=4, pin_memory=torch.cuda.is_available())
+val_dl = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=2, pin_memory=torch.cuda.is_available())
 train_steps = ceil(len(train_ds) / BATCH_SIZE)  # number of train and val steps
 val_steps = ceil(len(val_ds) / BATCH_SIZE)
 
 print(f"Total samples in train dataset: {len(train_ds)}")
 print(f"Total samples in val dataset: {len(val_ds)}")
 
+
+# for b in train_dl:
+#     print(b[0].size())
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # get cuda device
-model = LSTMClassifier(30, 128, len(ds_config['classes'])).to(device)
-#model = MultiLayerBiLSTMClassifier(2078, 256, 2, len(ds_config['classes'])).to(device)
+model = resnet3d('resnet18', n_classes=len(ds_config['classes'])).to(device)
+#summary(model, (3, 32, 256, 256))
+
 optimizer = Adam(model.parameters(), lr=LR)
 scheduler = ExponentialLR(optimizer, gamma=0.9)
 train_loss = nn.CrossEntropyLoss()
@@ -38,7 +49,6 @@ precision = Precision(num_classes=len(ds_config['classes']), task='multiclass', 
 recall = Recall(num_classes=len(ds_config['classes']), task='multiclass', average='macro').to(device)
 ap = AveragePrecision(num_classes=len(ds_config['classes']), task='multiclass', average='macro').to(device)
 acc = Accuracy(num_classes=len(ds_config['classes']), task='multiclass', average='micro').to(device)
-
 es = EarlyStopping(5)
 best_val_ap = 0
 
@@ -57,7 +67,6 @@ for epoch in range(EPOCHS):
             tepoch.set_description(f"GPU usage {mem_used_MB} MB EPOCH {epoch + 1}/{EPOCHS} TRAINING")
             X_train, y_train = X_train.to(device), y_train.to(device)  # get data
             y_pred = model(X_train)  # get predictions
-            
             loss = train_loss(y_pred, y_train)
             optimizer.zero_grad()
             loss.backward()  # back propogation
@@ -65,9 +74,11 @@ for epoch in range(EPOCHS):
             total_loss += loss.item()
             tepoch.set_postfix(loss=loss.item())
             time.sleep(0.1)
+
     total_loss = total_loss / train_steps
     print(f"Train loss: {total_loss:.4f}\n")
     scheduler.step()  # apply lr decay
+    
     with torch.no_grad():
         model.eval()
         with tqdm(val_dl, unit='batch') as vepoch:
@@ -86,11 +97,10 @@ for epoch in range(EPOCHS):
 Accuracy {acc.compute():.4f} mAP: {total_ap:.4f}\n""")
     if total_ap > best_val_ap:  # save best weights
         best_val_ap = total_ap
-        torch.save(model.state_dict(), "best_lstm.pt")
+        torch.save(model.state_dict(), "best_3dconv.pt")
     if es.step(total_ap):  # check early stopping
         print(f'Activating early stopping callback at epoch {epoch}')
         break
-    
 
 from torcheval.metrics import MulticlassAccuracy, MulticlassAUPRC, MulticlassPrecision, MulticlassRecall
 
@@ -99,7 +109,7 @@ m_ap = MulticlassAUPRC(num_classes=len(ds_config['classes']), average=None).to(d
 mp = MulticlassPrecision(num_classes=len(ds_config['classes']), average=None).to(device)
 mr = MulticlassRecall(num_classes=len(ds_config['classes']), average=None).to(device)
 
-model.load_state_dict(torch.load('best_lstm.pt'))
+model.load_state_dict(torch.load('best_3dconv.pt'))
 
 with torch.no_grad():
     model.eval()

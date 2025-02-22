@@ -11,6 +11,7 @@ class KeypointsAugmentor:
         self.n_kpts = len(config['selected_ids'])  # number of kpts in feature vector
         self.features = config['features']
         self.n_angles = len(config['angle_pairs'])
+        assert not config['crop_features'], 'KeypointsAugmentor can augment keypoints only'
 
     def __flip_position(self, pos_features: torch.Tensor, 
                         type: Literal['horizontal', 'vertical']) -> torch.Tensor:
