@@ -5,7 +5,7 @@ from mmpose.apis import inference_topdown, init_model
 import joblib
 from configs import TOPVIEWRODENTS_CONFIG
 from models import LSTMClassifier
-from utils import bbox, angle, pairwise_distances, pose_acceleration, pose_speed
+from utils import FeatureGenerator
 from typing import Dict
 from torchvision import transforms, models
 from torch import nn
@@ -37,32 +37,7 @@ class Inferencer:
         self.selected_ids = config['selected_ids']
         self.angle_pairs = config['angle_pairs']
         self.features = config['features']
-
-    def feature_matrix(self, kpts: np.ndarray) -> np.ndarray:
-        # compute feature vector
-        assert len(kpts.shape) == 2, f"kpts must have shape (n_frames, n_kpts * 2) but got shape {kpts.shape} instead"
-        assert kpts.shape[1] % 2 == 0, f"n_kpts * 2 must be even but got n_kpts * 2 = {kpts.shape[1]} instead"
-        n_frames = kpts.shape[0]
-        if 'bbox' in self.features:
-            bboxes = kpts[:, :4]
-            kpts = kpts[:, 4:]
-        kpts = kpts.reshape((n_frames, -1, 2))
-        out_features = []
-        selected_kpts = kpts[:, self.selected_ids, :].reshape((n_frames, -1))  # select keypoints
-        if 'position' in self.features:
-            out_features.append(selected_kpts)
-        if 'bbox' in self.features:
-            out_features.append(bbox(bboxes))
-        if 'angles' in self.features and len(self.angle_pairs):
-            angles = np.concatenate([angle(kpts[:, pair[1], :] - kpts[:, pair[0], :]) for pair in self.angle_pairs], axis=1)
-            out_features.append(angles)
-        if 'distance' in self.features:
-            out_features.append(pairwise_distances(selected_kpts))
-        if 'speed' in self.features:
-            out_features.append(pose_speed(selected_kpts))
-        if 'acceleration' in self.features:
-            out_features.append(pose_acceleration(selected_kpts))
-        return np.concatenate(out_features, axis=1)
+        self.feature_generator = FeatureGenerator(config)
     
     def img_features(self, frame: np.ndarray, bbox: np.ndarray) -> np.ndarray:
         H, W = frame.shape[:2]
@@ -112,7 +87,7 @@ class Inferencer:
             else:
                 stacked_kpts.append(keypoints.flatten())
             if len(stacked_kpts) == w_size:
-                f_matrix = self.feature_matrix(np.array(stacked_kpts))
+                f_matrix = self.feature_generator.build_feature_matrix(np.array(stacked_kpts))
                 clf_features = np.concatenate((f_matrix, np.array(stacked_f)), axis=1)
                 clf_features = torch.from_numpy(clf_features).cuda().float()
                 with torch.no_grad():

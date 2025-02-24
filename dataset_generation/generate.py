@@ -10,7 +10,8 @@ import torchvision.models as models
 import torch.nn as nn
 import torch
 from sklearn.model_selection import train_test_split
-from utils import *
+from utils import FeatureGenerator, labels2kpts, read_feature, read_label
+from math import floor
 
 
 class DatasetGenerator:
@@ -20,54 +21,7 @@ class DatasetGenerator:
         self.selected_ids = config['selected_ids']
         self.angle_pairs = config['angle_pairs']
         self.features = config['features']
-
-    def feature_matrix(self, kpts: np.ndarray) -> np.ndarray:
-        # compute feature vector
-        assert len(kpts.shape) == 2, f"kpts must have shape (n_frames, n_kpts * 2) but got shape {kpts.shape} instead"
-        assert kpts.shape[1] % 2 == 0, f"n_kpts * 2 must be even but got n_kpts * 2 = {kpts.shape[1]} instead"
-        n_frames = kpts.shape[0]
-        if 'bbox' in self.features:
-            bboxes = kpts[:, :4]
-            kpts = kpts[:, 4:]
-        kpts = kpts.reshape((n_frames, -1, 2))
-        out_features = []
-        selected_kpts = kpts[:, self.selected_ids, :].reshape((n_frames, -1))  # select keypoints
-        if 'position' in self.features:
-            out_features.append(selected_kpts)
-        if 'bbox' in self.features:
-            out_features.append(bbox(bboxes))
-        if 'angles' in self.features and len(self.angle_pairs):
-            angles = np.concatenate([angle(kpts[:, pair[1], :] - kpts[:, pair[0], :]) for pair in self.angle_pairs], axis=1)
-            out_features.append(angles)
-        if 'distance' in self.features:
-            out_features.append(pairwise_distances(selected_kpts))
-        if 'speed' in self.features:
-            out_features.append(pose_speed(selected_kpts))
-        if 'acceleration' in self.features:
-            out_features.append(pose_acceleration(selected_kpts))
-        return np.concatenate(out_features, axis=1)
-    
-    def build_stat_feature_vector(self, kpts_window: np.ndarray,
-                                  n_subwindows: int = 2) -> np.ndarray:
-        # Build feature vector for gradient boosting classifier
-        # Compute and concatenate features mean, min, max, and std inside provided window and subwindows
-        w_size = kpts_window.shape[0]
-        assert w_size % 2 == 0, f"size of window must be even but got {w_size} instead"
-        f_matrix = self.feature_matrix(kpts_window)  # compute features in whole window
-        #print(f_matrix.shape)
-        f_vector = np.concatenate((f_matrix.mean(axis=0), f_matrix.min(axis=0), 
-                                f_matrix.max(axis=0), f_matrix.std(axis=0)))
-        #print(f_vector.shape)
-        if n_subwindows > 0:
-            w_c = w_size // 2  # center of the window
-            new_w_size = w_size // 2  # new size of the window
-            for _ in range(n_subwindows):
-                new_f_matrix = f_matrix[w_c - new_w_size // 2 : w_c + new_w_size // 2]  # get data in a subwindow
-                new_f_vector = np.concatenate((new_f_matrix.mean(axis=0), new_f_matrix.min(axis=0), 
-                                            new_f_matrix.max(axis=0), new_f_matrix.std(axis=0)))
-                f_vector = np.concatenate((f_vector, new_f_vector))  # append it to feature vector
-                new_w_size = new_w_size // 2
-        return f_vector
+        self.feature_generator = FeatureGenerator(config)
     
     def generate_stat_dataset(self, w_size: int, n_subwindows: int, save_path: str, overlap: float = 0.3) -> None:
         data = []
@@ -87,7 +41,8 @@ class DatasetGenerator:
                 # print(step)
                 # print(n_steps)
                 for i in range(n_steps):
-                    f_vector = self.build_stat_feature_vector(label[i * step : i * step + w_size].copy(), n_subwindows).tolist()
+                    f_matrix = self.feature_generator.build_feature_matrix(label[i * step : i * step + w_size].copy())
+                    f_vector = self.feature_generator.build_stat_feature_vector(f_matrix, n_subwindows).tolist()
                     f_vector.append(id)
                     data.append(f_vector)
 
@@ -191,32 +146,7 @@ class DatasetGeneratorLSTM:
         self.selected_ids = config['selected_ids']
         self.angle_pairs = config['angle_pairs']
         self.features = config['features']
-
-    def feature_matrix(self, kpts: np.ndarray) -> np.ndarray:
-        # compute feature vector
-        assert len(kpts.shape) == 2, f"kpts must have shape (n_frames, n_kpts * 2) but got shape {kpts.shape} instead"
-        assert kpts.shape[1] % 2 == 0, f"n_kpts * 2 must be even but got n_kpts * 2 = {kpts.shape[1]} instead"
-        n_frames = kpts.shape[0]
-        if 'bbox' in self.features:
-            bboxes = kpts[:, :4]
-            kpts = kpts[:, 4:]
-        kpts = kpts.reshape((n_frames, -1, 2))
-        out_features = []
-        selected_kpts = kpts[:, self.selected_ids, :].reshape((n_frames, -1))  # select keypoints
-        if 'position' in self.features:
-            out_features.append(selected_kpts)
-        if 'bbox' in self.features:
-            out_features.append(bbox(bboxes))
-        if 'angles' in self.features and len(self.angle_pairs):
-            angles = np.concatenate([angle(kpts[:, pair[1], :] - kpts[:, pair[0], :]) for pair in self.angle_pairs], axis=1)
-            out_features.append(angles)
-        if 'distance' in self.features:
-            out_features.append(pairwise_distances(selected_kpts))
-        if 'speed' in self.features:
-            out_features.append(pose_speed(selected_kpts))
-        if 'acceleration' in self.features:
-            out_features.append(pose_acceleration(selected_kpts))
-        return np.concatenate(out_features, axis=1)
+        self.feature_generator = FeatureGenerator(config)
     
     def generate_lstm_dataset(self, w_size: int, save_folder: str, overlap: float = 0.3) -> None:
         labels_path = self.ds_config['labels']
@@ -240,7 +170,7 @@ class DatasetGeneratorLSTM:
                 step = floor((1 - overlap) * w_size)  # step of the sliding window
                 n_steps = (n_frames - w_size) // step  + 1  # number of steps for label
                 for i in range(n_steps):
-                    f_vector = self.feature_matrix(label[i * step : i * step + w_size].copy())  # build f vector from kpts
+                    f_vector = self.feature_generator.build_feature_matrix(label[i * step : i * step + w_size].copy())  # build f vector from kpts
                     if self.ds_config['crop_features']:
                         f_vector = np.concatenate((f_vector,
                                                    img_f[i * step : i * step + w_size].copy()), axis=1)
