@@ -10,7 +10,7 @@ import torchvision.models as models
 import torch.nn as nn
 import torch
 from sklearn.model_selection import train_test_split
-from utils import FeatureGenerator, labels2kpts, read_feature, read_label
+from utils import FeatureGenerator, labels2kpts, read_feature, read_label, FarnebackFeatureGenerator
 from math import floor
 
 
@@ -138,6 +138,33 @@ class AutoLabelActions:
                 with open(f"{root}/{cl}/img_features/{video.replace('.mp4', '.txt')}", 'w') as f:
                     f.writelines(out)
 
+    def label_flow_farneback(self, of_params: Dict) -> None:
+        root = self.ds_config['root']
+        videos_path = self.ds_config['videos']
+        labels_path = self.ds_config['labels']
+        classes = self.ds_config['classes']
+        of_path = self.ds_config['optical_flow']
+        for cl in tqdm(classes, total=len(classes)):
+            videos = sorted(os.listdir(f"{root}/{cl}/{videos_path}"))
+            os.makedirs(f"{root}/{cl}/{of_path}", exist_ok=True)
+            for video in tqdm(videos, total=len(videos)):
+                cap = cv2.VideoCapture(f"{root}/{cl}/{videos_path}/{video}")
+                _, frame = cap.read()
+                label, (W, H) = read_label(f"{root}/{cl}/{labels_path}/{video.replace('.mp4', '.txt')}")
+                label = label[1:, 1:5] * np.array((W, H) * 2)
+                label = label.astype(int)
+                fg = FarnebackFeatureGenerator(of_params, (320, 320), frame, label.shape[0])
+                for box in label:
+                    x1, y1, x2, y2 = box
+                    w, h = x2 - x1, y2 - y1
+                    x1 = max(0, int(x1 - w*0.15))
+                    x2 = min(W, int(x2 + w*0.15))
+                    y1 = max(0, int(y1 - h*0.15))
+                    y2 = min(H, int(y2 + h*0.15))
+                    _, frame = cap.read()  # read frame
+                    out = fg.step(frame)  # TODO add bbox support
+                np.save(f"{root}/{cl}/{of_path}/{video.replace('.mp4', '.npy')}", out.round(2))
+
 
 class DatasetGeneratorLSTM:
     def __init__(self, config: Dict):
@@ -189,10 +216,11 @@ class DatasetGeneratorLSTM:
                 step = floor((1 - overlap) * w_size)  # step of the sliding window
                 n_steps = (n_frames - w_size) // step  + 1  # number of steps for label
                 for i in range(n_steps):
-                    f_vector = self.feature_matrix(label[i * step : i * step + w_size].copy())  # build f vector from kpts
+                    f_vector = self.feature_generator.build_feature_matrix(label[i * step : i * step + w_size].copy())  # build f vector from kpts
                     if self.ds_config['crop_features']:
                         f_vector = np.concatenate((f_vector,
                                                    img_f[i * step : i * step + w_size].copy()), axis=1)
                     f_vector = np.concatenate((f_vector, np.ones((f_vector.shape[0], 1)) * id), axis=1)
                     data.append(np.round(f_vector, 4))
             np.save(f"{root_path}/{save_folder}/val/{cl}.npy", data)
+    

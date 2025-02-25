@@ -12,7 +12,6 @@ from .augmentation import KeypointsAugmentor
 from .utils import read_label
 
 
-
 class LSTMDataset(Dataset):
     def __init__(self, config: Dict, subset: str, cl: str, augment: bool = False):
         super().__init__()
@@ -38,9 +37,35 @@ class LSTMDataset(Dataset):
         return X.float(), y.long()
     
 
+class OpticalFlowDataset(Dataset):
+    def __init__(self, flow_path: str, cl: int, seq_length: int = 10,
+                 overlap: float = 0, offset: int = 0) -> None:
+        super().__init__()
+        self.cl = self.cl = torch.tensor(cl)
+        self.data = np.load(flow_path, mmap_mode='r')  # load npy per class in mmap mode
+        n_frames = self.data.shape[0] // 2 - 2 * offset
+        self.offset = offset
+        self.step = floor((1 - overlap) * seq_length)  # step of the sliding window
+        self.n_steps = (n_frames - seq_length) // self.step + 1 # number of steps for video
+        self.seq_length = seq_length
+
+    def __len__(self) -> int:
+        return self.n_steps
+    
+    def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+        
+        n = (idx * self.step + self.offset) * 2
+        frames = self.data[n : n + 2 * self.seq_length].copy()
+        frames = torch.from_numpy(frames)
+
+        return torch.permute(frames.float(), (2, 0, 1)), self.cl
+
+
 ### Dataset for one video file
 class Conv3DDataset(Dataset):
-    def __init__(self, video_path: str, label_path: int, input_shape: Tuple[int, int], cl: int, 
+    def __init__(self, video_path: str, label_path: str, input_shape: Tuple[int, int], cl: int, 
                  w_size: int, overlap: float = 0, offset: int = 0, augment: bool = False):
         super().__init__()
         self.w_size = w_size
@@ -91,7 +116,6 @@ class Conv3DDataset(Dataset):
 
         frames = torch.from_numpy(frames) / 255
         return torch.permute(frames.float(), (3, 0, 1, 2)), self.cl
-        #return frames, self.cl
 
 
 def build_conv3d_dataset(config: Dict, input_shape: Tuple[int, int],
@@ -113,5 +137,24 @@ def build_conv3d_dataset(config: Dict, input_shape: Tuple[int, int],
                          for vid, label in zip(train_videos, train_labels)])
         val_ds.extend([Conv3DDataset(f"{v_dir}/{vid}", f"{l_dir}/{label}", input_shape, cl_id, w_size, overlap, offset) 
                          for vid, label in zip(val_videos, val_labels)])
+    
+    return ConcatDataset(train_ds), ConcatDataset(val_ds)
+
+
+def build_flow_dataset(config: Dict, seq_length: int = 10, overlap: float = 0, 
+                       offset: int = 0) -> Tuple[ConcatDataset, ConcatDataset]:
+    root = config['root']
+    optical_flow = config['optical_flow']
+    classes = config['classes']
+    train_ds, val_ds = [], []
+    for cl_id, cl in enumerate(classes):
+        flow_list = os.listdir(f"{root}/{cl}/{optical_flow}")
+        train_flow, val_flow = train_test_split(flow_list, test_size=0.2)
+        print(f"Number of videos in train set of class {cl_id}: {cl} is {len(train_flow)}")
+        print(f"Number of videos in val set of class {cl_id}: {cl} is {len(val_flow)}")
+        train_ds.extend([OpticalFlowDataset(f"{root}/{cl}/{optical_flow}/{flow}", cl_id, seq_length, overlap, offset) 
+                         for flow in train_flow])
+        val_ds.extend([OpticalFlowDataset(f"{root}/{cl}/{optical_flow}/{flow}", cl_id, seq_length, overlap, offset) 
+                         for flow in val_flow])
     
     return ConcatDataset(train_ds), ConcatDataset(val_ds)

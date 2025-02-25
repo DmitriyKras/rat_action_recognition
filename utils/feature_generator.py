@@ -1,5 +1,6 @@
+import cv2
 import numpy as np
-from typing import Tuple, Dict, List
+from typing import Tuple, Dict, List, Optional, Union
 from .utils import pose_acceleration, pose_speed, pairwise_distances, angle, bbox
 
 
@@ -56,3 +57,35 @@ class FeatureGenerator:
                 f_vector = np.concatenate((f_vector, new_f_vector))  # append it to feature vector
                 new_w_size = new_w_size // 2
         return f_vector
+
+
+class FarnebackFeatureGenerator:
+    def __init__(self, of_params: Dict, output_shape: Tuple[int, int], 
+                 frame: np.ndarray, w_size: int) -> None:
+        self.of_params = of_params  # optical flow params dict
+        self.output_shape = output_shape  # size of output fmap
+        self.prev_frame = cv2.cvtColor(cv2.resize(frame, self.output_shape), cv2.COLOR_BGR2GRAY)  # initial frame
+        self.out = []
+        self.w_size = w_size
+
+    def step(self, frame: np.ndarray, roi_shape: Optional[Tuple[int, int]] = None,
+                          bbox: Optional[np.ndarray] = None) -> Union[np.ndarray, None]:
+        if bbox is not None:
+            assert bbox.shape[0] == 4
+            assert roi_shape is not None
+
+        cur = cv2.cvtColor(cv2.resize(frame, self.output_shape), cv2.COLOR_BGR2GRAY)  # start with first frame
+        flow = cv2.calcOpticalFlowFarneback(self.prev_frame, cur, None, **self.of_params)  # calculate dense optical flow
+        if bbox is not None:
+            pass
+        else:
+            self.out.append(flow)
+
+        self.prev_frame = cur  # update prev frame
+
+        if len(self.out) == self.w_size:
+            out = np.concatenate(self.out, axis=-1)
+            self.out.pop(0)
+            return out
+        else:
+            return None
