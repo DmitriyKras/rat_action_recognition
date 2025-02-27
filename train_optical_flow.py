@@ -13,7 +13,7 @@ SEQ_LENGTH = 10
 
 train_ds, val_ds = build_flow_dataset(ds_config, 
                                         seq_length=SEQ_LENGTH, 
-                                        overlap=0, 
+                                        overlap=0.5, 
                                         offset=10)
 
 

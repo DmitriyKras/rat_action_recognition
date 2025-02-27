@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from mmdet.apis import DetInferencer
 from mmpose.apis import inference_topdown, init_model
 import cv2
@@ -138,7 +138,8 @@ class AutoLabelActions:
                 with open(f"{root}/{cl}/img_features/{video.replace('.mp4', '.txt')}", 'w') as f:
                     f.writelines(out)
 
-    def label_flow_farneback(self, of_params: Dict) -> None:
+    def label_flow_farneback(self, of_params: Dict, flow_shape: Tuple[int, int], 
+                             crop_bbox: bool = True) -> None:
         root = self.ds_config['root']
         videos_path = self.ds_config['videos']
         labels_path = self.ds_config['labels']
@@ -150,10 +151,12 @@ class AutoLabelActions:
             for video in tqdm(videos, total=len(videos)):
                 cap = cv2.VideoCapture(f"{root}/{cl}/{videos_path}/{video}")
                 _, frame = cap.read()
-                label, (W, H) = read_label(f"{root}/{cl}/{labels_path}/{video.replace('.mp4', '.txt')}")
-                label = label[1:, 1:5] * np.array((W, H) * 2)
+                label, _ = read_label(f"{root}/{cl}/{labels_path}/{video.replace('.mp4', '.txt')}")
+                W, H = flow_shape
+                label = label[1:, 1:5] * np.array(flow_shape * 2)
                 label = label.astype(int)
-                fg = FarnebackFeatureGenerator(of_params, (320, 320), frame, label.shape[0])
+                fg = FarnebackFeatureGenerator(of_params, flow_shape, frame, label.shape[0])
+                #print(f"{root}/{cl}/{videos_path}/{video}")
                 for box in label:
                     x1, y1, x2, y2 = box
                     w, h = x2 - x1, y2 - y1
@@ -162,7 +165,10 @@ class AutoLabelActions:
                     y1 = max(0, int(y1 - h*0.15))
                     y2 = min(H, int(y2 + h*0.15))
                     _, frame = cap.read()  # read frame
-                    out = fg.step(frame)  # TODO add bbox support
+                    if crop_bbox:
+                        out = fg.step(frame, roi_shape=(256, 256), bbox=np.array((x1, y1, x2, y2)))
+                    else:
+                        out = fg.step(frame)
                 np.save(f"{root}/{cl}/{of_path}/{video.replace('.mp4', '.npy')}", out.round(2).transpose((2, 0, 1)))
 
 

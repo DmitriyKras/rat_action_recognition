@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from skimage.transform import resize
 from typing import Tuple, Dict, List, Optional, Union
 from .utils import pose_acceleration, pose_speed, pairwise_distances, angle, bbox
 
@@ -60,11 +61,11 @@ class FeatureGenerator:
 
 
 class FarnebackFeatureGenerator:
-    def __init__(self, of_params: Dict, output_shape: Tuple[int, int], 
+    def __init__(self, of_params: Dict, flow_shape: Tuple[int, int], 
                  frame: np.ndarray, w_size: int) -> None:
         self.of_params = of_params  # optical flow params dict
-        self.output_shape = output_shape  # size of output fmap
-        self.prev_frame = cv2.cvtColor(cv2.resize(frame, self.output_shape), cv2.COLOR_BGR2GRAY)  # initial frame
+        self.flow_shape = flow_shape  # size of output fmap
+        self.prev_frame = cv2.cvtColor(cv2.resize(frame, self.flow_shape), cv2.COLOR_BGR2GRAY)  # initial frame
         self.out = []
         self.w_size = w_size
 
@@ -74,12 +75,16 @@ class FarnebackFeatureGenerator:
             assert bbox.shape[0] == 4
             assert roi_shape is not None
 
-        cur = cv2.cvtColor(cv2.resize(frame, self.output_shape), cv2.COLOR_BGR2GRAY)  # start with first frame
+        cur = cv2.cvtColor(cv2.resize(frame, self.flow_shape), cv2.COLOR_BGR2GRAY)  # start with first frame
         flow = cv2.calcOpticalFlowFarneback(self.prev_frame, cur, None, **self.of_params)  # calculate dense optical flow
         if bbox is not None:
-            pass
-        else:
-            self.out.append(flow)
+            x1, y1, x2, y2 = bbox
+            flow = flow[y1 : y2, x1 : x2, :]
+            #print(flow.shape)
+            flow = resize(flow, roi_shape[::-1])
+            #print(flow.shape)
+        
+        self.out.append(flow)
 
         self.prev_frame = cur  # update prev frame
 

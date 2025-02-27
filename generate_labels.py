@@ -8,16 +8,16 @@ of_params = {'pyr_scale': 0.5, 'levels': 3,
              'poly_n': 5, 
              'poly_sigma': 1.2, 'flags': 0}
 
-import numpy as np
+# import numpy as np
 
-of = np.load('/home/techtrans2/RAT_DATASETS/LAB_RAT_ACTIONS_DATASET/body_cleaning/optical_flow/body_cleaning_6.npy')
-print(of.shape)
-print(of[..., 0].max(), of[..., 0].min(), of[..., 0].mean())
+# of = np.load('/home/techtrans2/RAT_DATASETS/LAB_RAT_ACTIONS_DATASET/body_cleaning/optical_flow/body_cleaning_6.npy')
+# print(of.shape)
+# print(of[..., 0].max(), of[..., 0].min(), of[..., 0].mean())
 
 
 
-# labeler = AutoLabelActions(TOPVIEWRODENTS_CONFIG)
-# labeler.label_flow_farneback(of_params)
+labeler = AutoLabelActions(TOPVIEWRODENTS_CONFIG)
+labeler.label_flow_farneback(of_params, (960, 480))
 # labeler.label_bbox_kpts()
 # labeler.label_img_features()
 
