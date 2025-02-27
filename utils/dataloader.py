@@ -117,6 +117,45 @@ class Conv3DDataset(Dataset):
         return torch.permute(frames.float(), (3, 0, 1, 2)), self.cl
 
 
+class Conv2DDataset(Dataset):
+    def __init__(self, video_path: str, label_path: str, input_shape: Tuple[int, int], cl: int, 
+                 offset: int = 0, augment: bool = False):
+        super().__init__()
+        self.video_path = video_path
+        self.cl = torch.tensor(cl)
+        self.input_shape = input_shape
+        self.offset = offset
+        self.augment = augment
+        self.labels, wh = read_label(label_path)
+        self.labels = (self.labels[:, 1 : 5] * np.array(wh * 2)).astype(int)  # extract xyxy coordinates of bbox on every frame
+        self.n_frames = self.labels.shape[0] - 2 * offset  # total number of frames to be used
+        self.wh = wh  # save image width, height
+
+    def __len__(self) -> int:
+        return self.n_frames
+
+    def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+        
+        n = self.offset + idx
+        cap = cv2.VideoCapture(self.video_path)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, n)  # set pointer to frame
+        _, frame = cap.read()  # read frame
+        x1, y1, x2, y2 = self.labels[n, :]
+        w, h = x2 - x1, y2 - y1
+        x1, x2 = max(0, int(x1 - w * 0.2)), min(self.wh[0], int(x2 + w * 0.2))
+        y1, y2 = max(0, int(y1 - h * 0.2)), min(self.wh[1], int(y2 + h * 0.2))
+        frame = cv2.cvtColor(cv2.resize(frame[y1 : y2, x1 : x2, :], self.input_shape), cv2.COLOR_BGR2RGB)
+
+        # if self.augment:
+        #     transformed = self.transform(images=frames)
+        #     frames = transformed['images']
+
+        frames = torch.from_numpy(frames) / 255
+        return torch.permute(frames.float(), (2, 0, 1)), self.cl
+    
+
 def build_conv3d_dataset(config: Dict, input_shape: Tuple[int, int],
                          w_size: int, overlap: float = 0, offset: int = 0) -> Tuple[ConcatDataset, ConcatDataset]:
     root = config['root']
@@ -155,5 +194,28 @@ def build_flow_dataset(config: Dict, seq_length: int = 10, overlap: float = 0,
                          for flow in train_flow])
         val_ds.extend([OpticalFlowDataset(f"{root}/{cl}/{optical_flow}/{flow}", cl_id, seq_length, overlap, offset) 
                          for flow in val_flow])
+    
+    return ConcatDataset(train_ds), ConcatDataset(val_ds)
+
+
+def build_conv2d_dataset(config: Dict, input_shape: Tuple[int, int],
+                         offset: int = 0) -> Tuple[ConcatDataset, ConcatDataset]:
+    root = config['root']
+    videos = config['videos']
+    labels = config['labels']
+    classes = config['classes']
+    train_ds, val_ds = [], []
+    for cl_id, cl in enumerate(classes):
+        v_dir = f"{root}/{cl}/{videos}"
+        l_dir = f"{root}/{cl}/{labels}"
+        videos_list = sorted(os.listdir(v_dir))
+        labels_list = sorted(os.listdir(l_dir))
+        train_videos, val_videos, train_labels, val_labels = train_test_split(videos_list, labels_list, test_size=0.2)
+        print(f"Number of videos in train set of class {cl_id}: {cl} is {len(train_videos)}")
+        print(f"Number of videos in val set of class {cl_id}: {cl} is {len(val_videos)}")
+        train_ds.extend([Conv2DDataset(f"{v_dir}/{vid}", f"{l_dir}/{label}", input_shape, cl_id, offset) 
+                         for vid, label in zip(train_videos, train_labels)])
+        val_ds.extend([Conv2DDataset(f"{v_dir}/{vid}", f"{l_dir}/{label}", input_shape, cl_id, offset) 
+                         for vid, label in zip(val_videos, val_labels)])
     
     return ConcatDataset(train_ds), ConcatDataset(val_ds)
