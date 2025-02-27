@@ -59,8 +59,7 @@ class OpticalFlowDataset(Dataset):
         n = (idx * self.step + self.offset) * 2
         frames = self.data[n : n + 2 * self.seq_length].copy()
         frames = torch.from_numpy(frames)
-
-        return torch.permute(frames.float(), (2, 0, 1)), self.cl
+        return frames.float(), self.cl
 
 
 ### Dataset for one video file

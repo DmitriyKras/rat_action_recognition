@@ -163,7 +163,7 @@ class AutoLabelActions:
                     y2 = min(H, int(y2 + h*0.15))
                     _, frame = cap.read()  # read frame
                     out = fg.step(frame)  # TODO add bbox support
-                np.save(f"{root}/{cl}/{of_path}/{video.replace('.mp4', '.npy')}", out.round(2))
+                np.save(f"{root}/{cl}/{of_path}/{video.replace('.mp4', '.npy')}", out.round(2).transpose((2, 0, 1)))
 
 
 class DatasetGeneratorLSTM:

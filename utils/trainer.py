@@ -131,3 +131,4 @@ Accuracy {self.acc.compute():.4f} mAP: {total_ap:.4f}\n""")
             if self.es.step(total_ap):  # check early stopping
                 print(f'Activating early stopping callback at epoch {epoch}')
                 break
+        self.validate()
