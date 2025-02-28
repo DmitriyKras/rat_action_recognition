@@ -220,3 +220,9 @@ def build_conv2d_dataset(config: Dict, input_shape: Tuple[int, int],
                          for vid, label in zip(val_videos, val_labels)])
     
     return ConcatDataset(train_ds), ConcatDataset(val_ds)
+
+
+def build_lstm_dataset(config: Dict) -> Tuple[ConcatDataset, ConcatDataset]:
+    train_ds = ConcatDataset([LSTMDataset(config, 'train', cl) for cl in config['classes']])
+    val_ds = ConcatDataset([LSTMDataset(config, 'val', cl) for cl in config['classes']])
+    return train_ds, val_ds

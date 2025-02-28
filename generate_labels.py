@@ -16,16 +16,16 @@ of_params = {'pyr_scale': 0.5, 'levels': 3,
 
 
 
-labeler = AutoLabelActions(TOPVIEWRODENTS_CONFIG)
-labeler.label_flow_farneback(of_params, (960, 480))
+# labeler = AutoLabelActions(TOPVIEWRODENTS_CONFIG)
+# labeler.label_flow_farneback(of_params, (960, 480))
 # labeler.label_bbox_kpts()
 # labeler.label_img_features()
 
 
 
-#ds = DatasetGeneratorLSTM(TOPVIEWRODENTS_CONFIG)
+ds = DatasetGeneratorLSTM(TOPVIEWRODENTS_CONFIG)
 
-#ds.generate_lstm_dataset(16, 'lstm_dataset', 0.8)
+ds.generate_lstm_dataset(32, 'lstm_dataset', 0.3)
 # import numpy as np
 # data = np.load('lstm_dataset/val/scratching_back_paw.npy', mmap_mode='r')
 # print(data.shape)
