@@ -119,7 +119,7 @@ class Conv3DDataset(Dataset):
 
 class Conv2DDataset(Dataset):
     def __init__(self, video_path: str, label_path: str, input_shape: Tuple[int, int], cl: int, 
-                 offset: int = 0, augment: bool = False):
+                 offset: int = 0, step: int = 10, augment: bool = False):
         super().__init__()
         self.video_path = video_path
         self.cl = torch.tensor(cl)
@@ -128,17 +128,18 @@ class Conv2DDataset(Dataset):
         self.augment = augment
         self.labels, wh = read_label(label_path)
         self.labels = (self.labels[:, 1 : 5] * np.array(wh * 2)).astype(int)  # extract xyxy coordinates of bbox on every frame
-        self.n_frames = self.labels.shape[0] - 2 * offset  # total number of frames to be used
+        self.n_steps = (self.labels.shape[0] - 2 * offset) // step - 1  # total number of frames to be used
+        self.step = step
         self.wh = wh  # save image width, height
 
     def __len__(self) -> int:
-        return self.n_frames
+        return self.n_steps
 
     def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
         if torch.is_tensor(idx):
             idx = idx.tolist()
         
-        n = self.offset + idx
+        n = self.offset + idx * self.step
         cap = cv2.VideoCapture(self.video_path)
         cap.set(cv2.CAP_PROP_POS_FRAMES, n)  # set pointer to frame
         _, frame = cap.read()  # read frame
@@ -152,8 +153,8 @@ class Conv2DDataset(Dataset):
         #     transformed = self.transform(images=frames)
         #     frames = transformed['images']
 
-        frames = torch.from_numpy(frames) / 255
-        return torch.permute(frames.float(), (2, 0, 1)), self.cl
+        frame = torch.from_numpy(frame) / 255
+        return torch.permute(frame.float(), (2, 0, 1)), self.cl
     
 
 def build_conv3d_dataset(config: Dict, input_shape: Tuple[int, int],

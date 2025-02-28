@@ -11,7 +11,7 @@ ds_config = TOPVIEWRODENTS_CONFIG
 
 
 train_ds, val_ds = build_conv2d_dataset(ds_config, 
-                                        input_shape=(256, 256)
+                                        input_shape=(256, 256),
                                         offset=10)
 
 
