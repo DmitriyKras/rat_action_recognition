@@ -5,7 +5,7 @@ TOPVIEWRODENTS_SPINE_ANGLES = [[3, 0], [4, 3], [7, 4], [7, 0], [7, 3]]
 
 TOPVIEWRODENTS_CONFIG = {'name': 'TopViewRodents', 'kpts': {'nose': 0, 'right_ear': 1, 'left_ear': 2, 'neck': 3, 'center': 4,
                                                             'right_side_body': 5, 'left_side_body': 6, 'tail_base': 7},
-                        'root': '/home/techtrans2/RAT_DATASETS/LAB_RAT_ACTIONS_DATASET', 
+                        'root': '/home/cv-worker/dmitrii/RAT_DATASET/LAB_RAT_ACTIONS_DATASET', 
                         'videos': 'videos', 
                         'labels': 'labels_topviewrodents',
                         'optical_flow': 'optical_flow',
