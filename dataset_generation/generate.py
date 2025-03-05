@@ -53,10 +53,10 @@ class DatasetGenerator:
 
 class AutoLabelActions:
     def __init__(self, config: Dict, 
-                mmdet_config: Dict={'model': '/home/cv-worker/dmitrii/mmdetection/work_dirs/rtmdet_s_8xb32-300e_ratdataset/rtmdet_s_8xb32-300e_ratdataset.py',
-                                    'weights': '/home/cv-worker/dmitrii/mmdetection/work_dirs/rtmdet_s_8xb32-300e_ratdataset/epoch_200.pth'},
-                mmpose_config: Dict={'model': '/home/cv-worker/dmitrii/mmpose/work_dirs/topviewrodents/td-hm_hrnet-w48_udp-8xb32-210e_coco-256x192_topviewrodents.py',
-                                     'weights': '/home/cv-worker/dmitrii/mmpose/work_dirs/topviewrodents/best_PCK_epoch_320.pth'}):
+               mmdet_config: Dict={'model': '/home/cv-worker/dmitrii/weights/ratdet/rtmdet_s_8xb32-300e_ratdataset.py',
+                                    'weights': '/home/cv-worker/dmitrii/weights/ratdet/best_200.pth'},
+                mmpose_config: Dict={'model': '/home/cv-worker/dmitrii/weights/topviewrodents/td-hm_hrnet-w48_udp-8xb32-210e_coco-256x192_topviewrodents.py',
+                                     'weights': '/home/cv-worker/dmitrii/weights/topviewrodents/best_300.pth'}):
         self.ds_config = config
         self.bbox_detector = DetInferencer(model=mmdet_config['model'], 
                            weights=mmdet_config['weights'])
