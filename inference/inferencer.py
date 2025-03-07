@@ -17,7 +17,7 @@ class Inferencer:
                 mmdet_config: Dict={'model': '/home/cv-worker/dmitrii/weights/ratdet/rtmdet_s_8xb32-300e_ratdataset.py',
                                     'weights': '/home/cv-worker/dmitrii/weights/ratdet/best_200.pth'},
                 mmpose_config: Dict={'model': '/home/cv-worker/dmitrii/weights/topviewrodents/td-hm_hrnet-w48_udp-8xb32-210e_coco-256x192_topviewrodents.py',
-                                     'weights': '/home/cv-worker/dmitrii/weights/topviewrodents/best_300.pth'}):
+                                     'weights': '/home/cv-worker/dmitrii/weights/topviewrodents/best_180.pth'}):
         self.ds_config = config
         self.bbox_detector = DetInferencer(model=mmdet_config['model'], 
                            weights=mmdet_config['weights'])

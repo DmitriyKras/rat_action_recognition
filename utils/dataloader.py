@@ -157,6 +157,14 @@ class Conv2DDataset(Dataset):
         return torch.permute(frame.float(), (2, 0, 1)), self.cl
     
 
+class TwoStreamDataset(Dataset):
+    def __init__(self, video_path: str, label_path: str, flow_path: str, cl: int,
+                 input_shape: Tuple[int, int], step: int, seq_length: int = 10,
+                 offset: int = 0) -> None:
+        super().__init__()
+        
+    
+
 def build_conv3d_dataset(config: Dict, input_shape: Tuple[int, int],
                          w_size: int, overlap: float = 0, offset: int = 0) -> Tuple[ConcatDataset, ConcatDataset]:
     root = config['root']
