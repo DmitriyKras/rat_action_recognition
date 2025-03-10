@@ -10,6 +10,7 @@ from sklearn.model_selection import train_test_split
 import albumentations as A
 from .augmentation import KeypointsAugmentor
 from .utils import read_label
+import json
 
 
 class LSTMDataset(Dataset):
@@ -119,7 +120,7 @@ class Conv3DDataset(Dataset):
 
 class Conv2DDataset(Dataset):
     def __init__(self, video_path: str, label_path: str, input_shape: Tuple[int, int], cl: int, 
-                 offset: int = 0, step: int = 10, augment: bool = False):
+                 offset: int = 0, step: int = 5, augment: bool = False):
         super().__init__()
         self.video_path = video_path
         self.cl = torch.tensor(cl)
@@ -221,71 +222,78 @@ def split_videos_labels_flow(config: Dict, test_size: float = 0.3) -> None:
         val_ds.extend([vid, label, flow, cl_id]
                          for vid, label, flow in zip(val_videos, val_labels, val_flows))
 
-    print(train_ds)
-    print(val_ds)
+    with open("/home/cv-worker/dmitrii/rat_action_recognition/train_split.json", 'w') as f:
+        json.dump(train_ds, f)
+    with open("/home/cv-worker/dmitrii/rat_action_recognition/val_split.json", 'w') as f:
+        json.dump(val_ds, f)
 
 
-def build_conv3d_dataset(config: Dict, input_shape: Tuple[int, int],
+def build_conv3d_dataset(config: Dict, train_json: str, val_json: str, input_shape: Tuple[int, int],
                          w_size: int, overlap: float = 0, offset: int = 0) -> Tuple[ConcatDataset, ConcatDataset]:
     root = config['root']
     videos = config['videos']
     labels = config['labels']
     classes = config['classes']
-    train_ds, val_ds = [], []
-    for cl_id, cl in enumerate(classes):
-        v_dir = f"{root}/{cl}/{videos}"
-        l_dir = f"{root}/{cl}/{labels}"
-        videos_list = sorted(os.listdir(v_dir))
-        labels_list = sorted(os.listdir(l_dir))
-        train_videos, val_videos, train_labels, val_labels = train_test_split(videos_list, labels_list, test_size=0.3)
-        print(f"Number of videos in train set of class {cl_id}: {cl} is {len(train_videos)}")
-        print(f"Number of videos in val set of class {cl_id}: {cl} is {len(val_videos)}")
-        train_ds.extend([Conv3DDataset(f"{v_dir}/{vid}", f"{l_dir}/{label}", input_shape, cl_id, w_size, overlap, offset) 
-                         for vid, label in zip(train_videos, train_labels)])
-        val_ds.extend([Conv3DDataset(f"{v_dir}/{vid}", f"{l_dir}/{label}", input_shape, cl_id, w_size, overlap, offset) 
-                         for vid, label in zip(val_videos, val_labels)])
+    with open(train_json, 'r') as f:
+        train_meta = json.load(f)
+    with open(val_json, 'r') as f:
+        val_meta = json.load(f)
+    
+    train_ds = [Conv3DDataset(f"{root}/{classes[meta['class']]}/{videos}/{meta['video']}", 
+                              f"{root}/{classes[meta['class']]}/{labels}/{meta['label']}", 
+                              input_shape, meta['class'], w_size, overlap, offset) 
+                         for meta in train_meta]
+    
+    val_ds = [Conv3DDataset(f"{root}/{classes[meta['class']]}/{videos}/{meta['video']}", 
+                              f"{root}/{classes[meta['class']]}/{labels}/{meta['label']}", 
+                              input_shape, meta['class'], w_size, overlap, offset) 
+                         for meta in val_meta]
     
     return ConcatDataset(train_ds), ConcatDataset(val_ds)
 
 
-def build_flow_dataset(config: Dict, seq_length: int = 10, overlap: float = 0, 
+def build_flow_dataset(config: Dict, train_json: str, val_json: str, seq_length: int = 10, overlap: float = 0, 
                        offset: int = 0) -> Tuple[ConcatDataset, ConcatDataset]:
     root = config['root']
     optical_flow = config['optical_flow']
     classes = config['classes']
-    train_ds, val_ds = [], []
-    for cl_id, cl in enumerate(classes):
-        flow_list = os.listdir(f"{root}/{cl}/{optical_flow}")
-        train_flow, val_flow = train_test_split(flow_list, test_size=0.3)
-        print(f"Number of videos in train set of class {cl_id}: {cl} is {len(train_flow)}")
-        print(f"Number of videos in val set of class {cl_id}: {cl} is {len(val_flow)}")
-        train_ds.extend([OpticalFlowDataset(f"{root}/{cl}/{optical_flow}/{flow}", cl_id, seq_length, overlap, offset) 
-                         for flow in train_flow])
-        val_ds.extend([OpticalFlowDataset(f"{root}/{cl}/{optical_flow}/{flow}", cl_id, seq_length, overlap, offset) 
-                         for flow in val_flow])
+    with open(train_json, 'r') as f:
+        train_meta = json.load(f)
+    with open(val_json, 'r') as f:
+        val_meta = json.load(f)
+
+    train_ds = [OpticalFlowDataset(f"{root}/{classes[meta['class']]}/{optical_flow}/{meta['flow']}", 
+                              meta['class'], seq_length, overlap, offset) 
+                         for meta in train_meta]
+    
+    val_ds = [OpticalFlowDataset(f"{root}/{classes[meta['class']]}/{optical_flow}/{meta['flow']}",  
+                              meta['class'], seq_length, overlap, offset) 
+                         for meta in val_meta]
     
     return ConcatDataset(train_ds), ConcatDataset(val_ds)
 
 
-def build_conv2d_dataset(config: Dict, input_shape: Tuple[int, int],
+def build_conv2d_dataset(config: Dict, train_json: str, val_json: str, input_shape: Tuple[int, int],
                          offset: int = 0) -> Tuple[ConcatDataset, ConcatDataset]:
     root = config['root']
     videos = config['videos']
     labels = config['labels']
     classes = config['classes']
-    train_ds, val_ds = [], []
-    for cl_id, cl in enumerate(classes):
-        v_dir = f"{root}/{cl}/{videos}"
-        l_dir = f"{root}/{cl}/{labels}"
-        videos_list = sorted(os.listdir(v_dir))
-        labels_list = sorted(os.listdir(l_dir))
-        train_videos, val_videos, train_labels, val_labels = train_test_split(videos_list, labels_list, test_size=0.3)
-        print(f"Number of videos in train set of class {cl_id}: {cl} is {len(train_videos)}")
-        print(f"Number of videos in val set of class {cl_id}: {cl} is {len(val_videos)}")
-        train_ds.extend([Conv2DDataset(f"{v_dir}/{vid}", f"{l_dir}/{label}", input_shape, cl_id, offset) 
-                         for vid, label in zip(train_videos, train_labels)])
-        val_ds.extend([Conv2DDataset(f"{v_dir}/{vid}", f"{l_dir}/{label}", input_shape, cl_id, offset) 
-                         for vid, label in zip(val_videos, val_labels)])
+    
+    with open(train_json, 'r') as f:
+        train_meta = json.load(f)
+    with open(val_json, 'r') as f:
+        val_meta = json.load(f)
+
+    train_ds = [Conv2DDataset(f"{root}/{classes[meta['class']]}/{videos}/{meta['video']}", 
+                              f"{root}/{classes[meta['class']]}/{labels}/{meta['label']}", 
+                              input_shape, meta['class'], offset) 
+                         for meta in train_meta]
+    
+    val_ds = [Conv2DDataset(f"{root}/{classes[meta['class']]}/{videos}/{meta['video']}", 
+                              f"{root}/{classes[meta['class']]}/{labels}/{meta['label']}", 
+                              input_shape, meta['class'], offset) 
+                         for meta in val_meta]
     
     return ConcatDataset(train_ds), ConcatDataset(val_ds)
 
@@ -296,29 +304,30 @@ def build_lstm_dataset(config: Dict) -> Tuple[ConcatDataset, ConcatDataset]:
     return train_ds, val_ds
 
 
-def build_two_stream_dataset(config: Dict, input_shape: Tuple[int, int], step: int,  seq_length: int = 10, 
-                         offset: int = 0) -> Tuple[ConcatDataset, ConcatDataset]:
+def build_two_stream_dataset(config: Dict, train_json: str, val_json: str, input_shape: Tuple[int, int], 
+                             step: int,  seq_length: int = 10, 
+                             offset: int = 0) -> Tuple[ConcatDataset, ConcatDataset]:
     root = config['root']
     videos = config['videos']
     labels = config['labels']
     classes = config['classes']
     optical_flow = config['optical_flow']
-    train_ds, val_ds = [], []
-    for cl_id, cl in enumerate(classes):
-        v_dir = f"{root}/{cl}/{videos}"
-        l_dir = f"{root}/{cl}/{labels}"
-        f_dir = f"{root}/{cl}/{optical_flow}"
-        videos_list = sorted(os.listdir(v_dir))
-        labels_list = sorted(os.listdir(l_dir))
-        flow_list = sorted(os.listdir(f_dir))
-        train_videos, val_videos, train_labels, val_labels, \
-        train_flows, val_flows = train_test_split(videos_list, labels_list, flow_list, test_size=0.3)
-        print(f"Number of videos in train set of class {cl_id}: {cl} is {len(train_videos)}")
-        print(f"Number of videos in val set of class {cl_id}: {cl} is {len(val_videos)}")
-        train_ds.extend([TwoStreamDataset(f"{v_dir}/{vid}", f"{l_dir}/{label}", f"{f_dir}/{flow}", cl_id, input_shape, 
-                                          step, seq_length, offset) 
-                         for vid, label, flow in zip(train_videos, train_labels, train_flows)])
-        val_ds.extend([TwoStreamDataset(f"{v_dir}/{vid}", f"{l_dir}/{label}", f"{f_dir}/{flow}", cl_id, input_shape, 
-                                          step, seq_length, offset) 
-                         for vid, label, flow in zip(val_videos, val_labels, val_flows)])
+    
+    with open(train_json, 'r') as f:
+        train_meta = json.load(f)
+    with open(val_json, 'r') as f:
+        val_meta = json.load(f)
+
+    train_ds = [TwoStreamDataset(f"{root}/{classes[meta['class']]}/{videos}/{meta['video']}", 
+                              f"{root}/{classes[meta['class']]}/{labels}/{meta['label']}",
+                              f"{root}/{classes[meta['class']]}/{optical_flow}/{meta['flow']}",
+                              meta['class'], input_shape, step, seq_length, offset) 
+                         for meta in train_meta]
+    
+    val_ds = [TwoStreamDataset(f"{root}/{classes[meta['class']]}/{videos}/{meta['video']}", 
+                              f"{root}/{classes[meta['class']]}/{labels}/{meta['label']}",
+                              f"{root}/{classes[meta['class']]}/{optical_flow}/{meta['flow']}",
+                              meta['class'], input_shape, step, seq_length, offset) 
+                         for meta in val_meta]
+
     return ConcatDataset(train_ds), ConcatDataset(val_ds)
