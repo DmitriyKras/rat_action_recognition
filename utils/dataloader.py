@@ -162,8 +162,43 @@ class TwoStreamDataset(Dataset):
                  input_shape: Tuple[int, int], step: int, seq_length: int = 10,
                  offset: int = 0) -> None:
         super().__init__()
-        
+        self.video_path = video_path
+        self.cl = torch.tensor(cl)
+        self.input_shape = input_shape
+        self.offset = offset
+        self.labels, wh = read_label(label_path)
+        self.data = np.load(flow_path, mmap_mode='r')  # load npy per class in mmap mode
+        n_frames = self.data.shape[0] // 2
+        self.labels = (self.labels[:n_frames, 1 : 5] * np.array(wh * 2)).astype(int)  # extract xyxy coordinates of bbox on every frame
+        self.n_steps = (self.labels.shape[0] - 2 * offset - seq_length) // step - 1  # total number of frames to be used
+        self.step = step
+        self.seq_length = seq_length
+        self.wh = wh  # save image width, height
+
+    def __len__(self) -> int:
+        return self.n_steps
     
+    def __getitem__(self, idx) -> Tuple[Tuple[torch.Tensor, torch.Tensor], torch.Tensor]:
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+        
+        n = self.offset + idx * self.step
+        # Load RGB frame
+        cap = cv2.VideoCapture(self.video_path)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, n)  # set pointer to frame
+        _, frame = cap.read()  # read frame
+        x1, y1, x2, y2 = self.labels[n, :]
+        w, h = x2 - x1, y2 - y1
+        x1, x2 = max(0, int(x1 - w * 0.2)), min(self.wh[0], int(x2 + w * 0.2))
+        y1, y2 = max(0, int(y1 - h * 0.2)), min(self.wh[1], int(y2 + h * 0.2))
+        frame = cv2.cvtColor(cv2.resize(frame[y1 : y2, x1 : x2, :], self.input_shape), cv2.COLOR_BGR2RGB)
+        frame = torch.from_numpy(frame) / 255
+        frame = torch.permute(frame.float(), (2, 0, 1))
+        # Load flow
+        frames = self.data[n * 2 : n * 2 + 2 * self.seq_length].copy()
+        frames = torch.from_numpy(frames).float()
+        return (frame, frames), self.cl
+
 
 def build_conv3d_dataset(config: Dict, input_shape: Tuple[int, int],
                          w_size: int, overlap: float = 0, offset: int = 0) -> Tuple[ConcatDataset, ConcatDataset]:
@@ -234,3 +269,31 @@ def build_lstm_dataset(config: Dict) -> Tuple[ConcatDataset, ConcatDataset]:
     train_ds = ConcatDataset([LSTMDataset(config, 'train', cl) for cl in config['classes']])
     val_ds = ConcatDataset([LSTMDataset(config, 'val', cl) for cl in config['classes']])
     return train_ds, val_ds
+
+
+def build_two_stream_dataset(config: Dict, input_shape: Tuple[int, int], step: int,  seq_length: int = 10, 
+                         offset: int = 0) -> Tuple[ConcatDataset, ConcatDataset]:
+    root = config['root']
+    videos = config['videos']
+    labels = config['labels']
+    classes = config['classes']
+    optical_flow = config['optical_flow']
+    train_ds, val_ds = [], []
+    for cl_id, cl in enumerate(classes):
+        v_dir = f"{root}/{cl}/{videos}"
+        l_dir = f"{root}/{cl}/{labels}"
+        f_dir = f"{root}/{cl}/{optical_flow}"
+        videos_list = sorted(os.listdir(v_dir))
+        labels_list = sorted(os.listdir(l_dir))
+        flow_list = sorted(os.listdir(f_dir))
+        train_videos, val_videos, train_labels, val_labels, \
+        train_flows, val_flows = train_test_split(videos_list, labels_list, flow_list, test_size=0.2)
+        print(f"Number of videos in train set of class {cl_id}: {cl} is {len(train_videos)}")
+        print(f"Number of videos in val set of class {cl_id}: {cl} is {len(val_videos)}")
+        train_ds.extend([TwoStreamDataset(f"{v_dir}/{vid}", f"{l_dir}/{label}", f"{f_dir}/{flow}", cl_id, input_shape, 
+                                          step, seq_length, offset) 
+                         for vid, label, flow in zip(train_videos, train_labels, train_flows)])
+        val_ds.extend([TwoStreamDataset(f"{v_dir}/{vid}", f"{l_dir}/{label}", f"{f_dir}/{flow}", cl_id, input_shape, 
+                                          step, seq_length, offset) 
+                         for vid, label, flow in zip(val_videos, val_labels, val_flows)])
+    return ConcatDataset(train_ds), ConcatDataset(val_ds)

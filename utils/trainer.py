@@ -25,7 +25,7 @@ class ClassificationTrainer:
 
     def __prepare_data(self, batch: int) -> None:
         self.train_dl = DataLoader(self.train_ds, batch_size=batch, shuffle=True, num_workers=4)
-        self.val_dl = DataLoader(self.val_ds, batch_size=batch * 2, shuffle=True, num_workers=2)
+        self.val_dl = DataLoader(self.val_ds, batch_size=batch * 2, shuffle=False, num_workers=2)
 
     def __prepare_for_train(self, lr: float) -> None:
         self.optimizer = Adam(self.model.parameters(), lr=lr)
