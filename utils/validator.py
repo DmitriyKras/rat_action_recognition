@@ -53,15 +53,15 @@ class TwoStreamValidator:
                     time.sleep(0.1)
 
         for key in metrics.keys():
-            acc = metrics[key].compute()
-            ap = metrics[key].compute()
-            prec = metrics[key].compute()
-            rec = metrics[key].compute()
-            [print(f"Accuracy for class {self.config['classes'][i]} {acc[i]}") for i in range(len(self.config['classes']))]
-            print(f"Mean accuracy {acc.mean()}")
-            [print(f"Average Precision for class {self.config['classes'][i]} {ap[i]}") for i in range(len(self.config['classes']))]
-            print(f"Mean Average Precision {ap.mean()}")
-            [print(f"Precision for class {self.config['classes'][i]} {prec[i]}") for i in range(len(self.config['classes']))]
-            print(f"Mean precision {prec.mean()}")
-            [print(f"Recall for class {self.config['classes'][i]} {rec[i]}") for i in range(len(self.config['classes']))]
-            print(f"Mean recall {rec.mean()}")
+            acc = metrics[key][0].compute()
+            ap = metrics[key][1].compute()
+            prec = metrics[key][2].compute()
+            rec = metrics[key][3].compute()
+            [print(f"Accuracy for model {key} for class {self.config['classes'][i]} {acc[i]}") for i in range(len(self.config['classes']))]
+            print(f"Mean accuracy for model {key} {acc.mean()}")
+            [print(f"Average Precision for model {key} for class {self.config['classes'][i]} {ap[i]}") for i in range(len(self.config['classes']))]
+            print(f"Mean Average Precision for model {key} {ap.mean()}")
+            [print(f"Precision for model {key} for class {self.config['classes'][i]} {prec[i]}") for i in range(len(self.config['classes']))]
+            print(f"Mean precision for model {key} {prec.mean()}")
+            [print(f"Recall for model {key} for class {self.config['classes'][i]} {rec[i]}") for i in range(len(self.config['classes']))]
+            print(f"Mean recall for model {key} {rec.mean()}\n")

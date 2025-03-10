@@ -200,6 +200,31 @@ class TwoStreamDataset(Dataset):
         return (frame, frames), self.cl
 
 
+def split_videos_labels_flow(config: Dict, test_size: float = 0.3) -> None:
+    root = config['root']
+    videos = config['videos']
+    labels = config['labels']
+    classes = config['classes']
+    optical_flow = config['optical_flow']
+    train_ds, val_ds = [], []
+    for cl_id, cl in enumerate(classes):
+        v_dir = f"{root}/{cl}/{videos}"
+        l_dir = f"{root}/{cl}/{labels}"
+        f_dir = f"{root}/{cl}/{optical_flow}"
+        videos_list = sorted(os.listdir(v_dir))
+        labels_list = sorted(os.listdir(l_dir))
+        flow_list = sorted(os.listdir(f_dir))
+        train_videos, val_videos, train_labels, val_labels, \
+        train_flows, val_flows = train_test_split(videos_list, labels_list, flow_list, test_size=test_size)
+        train_ds.extend([vid, label, flow, cl_id]
+                         for vid, label, flow in zip(train_videos, train_labels, train_flows))
+        val_ds.extend([vid, label, flow, cl_id]
+                         for vid, label, flow in zip(val_videos, val_labels, val_flows))
+
+    print(train_ds)
+    print(val_ds)
+
+
 def build_conv3d_dataset(config: Dict, input_shape: Tuple[int, int],
                          w_size: int, overlap: float = 0, offset: int = 0) -> Tuple[ConcatDataset, ConcatDataset]:
     root = config['root']
@@ -212,7 +237,7 @@ def build_conv3d_dataset(config: Dict, input_shape: Tuple[int, int],
         l_dir = f"{root}/{cl}/{labels}"
         videos_list = sorted(os.listdir(v_dir))
         labels_list = sorted(os.listdir(l_dir))
-        train_videos, val_videos, train_labels, val_labels = train_test_split(videos_list, labels_list, test_size=0.2)
+        train_videos, val_videos, train_labels, val_labels = train_test_split(videos_list, labels_list, test_size=0.3)
         print(f"Number of videos in train set of class {cl_id}: {cl} is {len(train_videos)}")
         print(f"Number of videos in val set of class {cl_id}: {cl} is {len(val_videos)}")
         train_ds.extend([Conv3DDataset(f"{v_dir}/{vid}", f"{l_dir}/{label}", input_shape, cl_id, w_size, overlap, offset) 
@@ -231,7 +256,7 @@ def build_flow_dataset(config: Dict, seq_length: int = 10, overlap: float = 0,
     train_ds, val_ds = [], []
     for cl_id, cl in enumerate(classes):
         flow_list = os.listdir(f"{root}/{cl}/{optical_flow}")
-        train_flow, val_flow = train_test_split(flow_list, test_size=0.2)
+        train_flow, val_flow = train_test_split(flow_list, test_size=0.3)
         print(f"Number of videos in train set of class {cl_id}: {cl} is {len(train_flow)}")
         print(f"Number of videos in val set of class {cl_id}: {cl} is {len(val_flow)}")
         train_ds.extend([OpticalFlowDataset(f"{root}/{cl}/{optical_flow}/{flow}", cl_id, seq_length, overlap, offset) 
@@ -254,7 +279,7 @@ def build_conv2d_dataset(config: Dict, input_shape: Tuple[int, int],
         l_dir = f"{root}/{cl}/{labels}"
         videos_list = sorted(os.listdir(v_dir))
         labels_list = sorted(os.listdir(l_dir))
-        train_videos, val_videos, train_labels, val_labels = train_test_split(videos_list, labels_list, test_size=0.2)
+        train_videos, val_videos, train_labels, val_labels = train_test_split(videos_list, labels_list, test_size=0.3)
         print(f"Number of videos in train set of class {cl_id}: {cl} is {len(train_videos)}")
         print(f"Number of videos in val set of class {cl_id}: {cl} is {len(val_videos)}")
         train_ds.extend([Conv2DDataset(f"{v_dir}/{vid}", f"{l_dir}/{label}", input_shape, cl_id, offset) 
@@ -287,7 +312,7 @@ def build_two_stream_dataset(config: Dict, input_shape: Tuple[int, int], step: i
         labels_list = sorted(os.listdir(l_dir))
         flow_list = sorted(os.listdir(f_dir))
         train_videos, val_videos, train_labels, val_labels, \
-        train_flows, val_flows = train_test_split(videos_list, labels_list, flow_list, test_size=0.2)
+        train_flows, val_flows = train_test_split(videos_list, labels_list, flow_list, test_size=0.3)
         print(f"Number of videos in train set of class {cl_id}: {cl} is {len(train_videos)}")
         print(f"Number of videos in val set of class {cl_id}: {cl} is {len(val_videos)}")
         train_ds.extend([TwoStreamDataset(f"{v_dir}/{vid}", f"{l_dir}/{label}", f"{f_dir}/{flow}", cl_id, input_shape, 
