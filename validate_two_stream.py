@@ -14,7 +14,7 @@ VAL_JSON = '/home/cv-worker/dmitrii/rat_action_recognition/val_split.json'
 
 
 dataset = build_two_stream_dataset(ds_config, TRAIN_JSON, VAL_JSON, input_shape=(256, 256),
-                                   step=5, seq_length=SEQ_LENGTH, offset=10)[1]
+                                   step=10, seq_length=SEQ_LENGTH, offset=10)[1]
 rgb_model = resnet50(in_channels=3, num_classes=len(ds_config['classes']))
 flow_model = resnet50(in_channels=2*SEQ_LENGTH, num_classes=len(ds_config['classes']))
 rgb_model.load_state_dict(torch.load(RGB_WEIGHTS))

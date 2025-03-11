@@ -217,9 +217,9 @@ def split_videos_labels_flow(config: Dict, test_size: float = 0.3) -> None:
         flow_list = sorted(os.listdir(f_dir))
         train_videos, val_videos, train_labels, val_labels, \
         train_flows, val_flows = train_test_split(videos_list, labels_list, flow_list, test_size=test_size)
-        train_ds.extend([vid, label, flow, cl_id]
+        train_ds.extend({'video': vid, 'label': label, 'flow': flow, 'class': cl_id}
                          for vid, label, flow in zip(train_videos, train_labels, train_flows))
-        val_ds.extend([vid, label, flow, cl_id]
+        val_ds.extend({'video': vid, 'label': label, 'flow': flow, 'class': cl_id}
                          for vid, label, flow in zip(val_videos, val_labels, val_flows))
 
     with open("/home/cv-worker/dmitrii/rat_action_recognition/train_split.json", 'w') as f:
