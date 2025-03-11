@@ -120,7 +120,7 @@ class Conv3DDataset(Dataset):
 
 class Conv2DDataset(Dataset):
     def __init__(self, video_path: str, label_path: str, input_shape: Tuple[int, int], cl: int, 
-                 offset: int = 0, step: int = 5, augment: bool = False):
+                 offset: int = 0, step: int = 10, augment: bool = False):
         super().__init__()
         self.video_path = video_path
         self.cl = torch.tensor(cl)
@@ -183,7 +183,7 @@ class TwoStreamDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
         
-        n = self.offset + idx * self.step
+        n = self.offset + idx * self.step + self.seq_length // 2
         # Load RGB frame
         cap = cv2.VideoCapture(self.video_path)
         cap.set(cv2.CAP_PROP_POS_FRAMES, n)  # set pointer to frame
@@ -196,7 +196,7 @@ class TwoStreamDataset(Dataset):
         frame = torch.from_numpy(frame) / 255
         frame = torch.permute(frame.float(), (2, 0, 1))
         # Load flow
-        frames = self.data[n * 2 : n * 2 + 2 * self.seq_length].copy()
+        frames = self.data[n * 2 - self.seq_length: n * 2 + self.seq_length].copy()
         frames = torch.from_numpy(frames).float()
         return (frame, frames), self.cl
 

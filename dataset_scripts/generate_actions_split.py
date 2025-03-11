@@ -1,0 +1,5 @@
+from utils import split_videos_labels_flow
+from configs import TOPVIEWRODENTS_CONFIG
+
+
+split_videos_labels_flow(TOPVIEWRODENTS_CONFIG)

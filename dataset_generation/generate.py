@@ -70,6 +70,7 @@ class AutoLabelActions:
         classes = self.ds_config['classes']
         for cl in tqdm(classes, total=len(classes)):
             videos = os.listdir(f"{root}/{cl}/{videos_path}")
+            os.makedirs(f"{root}/{cl}/{labels_path}", exist_ok=True)
             for video in tqdm(videos, total=len(videos)):
                 out = []  # output list with string labels
                 cap = cv2.VideoCapture(f"{root}/{cl}/{videos_path}/{video}")
@@ -160,10 +161,10 @@ class AutoLabelActions:
                 for box in label:
                     x1, y1, x2, y2 = box
                     w, h = x2 - x1, y2 - y1
-                    x1 = max(0, int(x1 - w*0.15))
-                    x2 = min(W, int(x2 + w*0.15))
-                    y1 = max(0, int(y1 - h*0.15))
-                    y2 = min(H, int(y2 + h*0.15))
+                    x1 = max(0, int(x1 - w*0.2))
+                    x2 = min(W, int(x2 + w*0.2))
+                    y1 = max(0, int(y1 - h*0.2))
+                    y2 = min(H, int(y2 + h*0.2))
                     _, frame = cap.read()  # read frame
                     if crop_bbox:
                         out = fg.step(frame, roi_shape=(256, 256), bbox=np.array((x1, y1, x2, y2)))
