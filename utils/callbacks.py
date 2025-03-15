@@ -10,7 +10,7 @@ class EarlyStopping:
             improvement
         """
         self.patience = patience
-        self.last_loss = 1  # current loss
+        self.best_loss = 0  # current loss
         self.epochs = 0  # counter
 
 
@@ -27,11 +27,11 @@ class EarlyStopping:
         bool
             Activate saving
         """
-        if loss < self.last_loss:
+        if loss < self.best_loss:
             self.epochs += 1  # increase counter
         else:
+            self.best_loss = loss
             self.epochs = 0  # reset counter
-        self.last_loss = loss
         if self.epochs == self.patience:
             return True  # activate callback
         else:

@@ -14,28 +14,28 @@ import json
 
 
 class LSTMDataset(Dataset):
-    def __init__(self, config: Dict, subset: str, cl: str, augment: bool = False):
+    def __init__(self, lstm_path: str, cl: int, seq_length: int = 10,
+                 overlap: float = 0, offset: int = 0) -> None:
         super().__init__()
-        self.config = config
-        self.root = config['root'] + '/lstm_dataset'
-        self.subset = subset
-        self.cl = cl
-        self.data = np.load(f"{self.root}/{subset}/{cl}.npy", mmap_mode='r')  # load npy per class in mmap mode
-        self.augment = augment
-        self.augmentor = KeypointsAugmentor(config)
+        self.cl = self.cl = torch.tensor(cl)
+        self.data = np.load(lstm_path, mmap_mode='r')  # load npy video in mmap mode
+        n_frames = self.data.shape[0] // 2 - 2 * offset
+        self.offset = offset
+        self.step = floor((1 - overlap) * seq_length)  # step of the sliding window
+        self.n_steps = (n_frames - seq_length) // self.step + 1 # number of steps for video
+        self.seq_length = seq_length
 
     def __len__(self):
-        return self.data.shape[0]
+        return self.n_steps
     
-    def __getitem__(self, idx):
+    def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
         if torch.is_tensor(idx):
             idx = idx.tolist()
         
-        data = self.data[idx]
-        X, y = torch.from_numpy(data[:, :-1].copy()), torch.tensor(data[0, -1])
-        if self.augment:
-            X = self.augmentor.augment(X)
-        return X.float(), y.long()
+        n = idx * self.step + self.offset
+        kpts = self.data[n : n + self.seq_length].copy()
+        kpts = torch.from_numpy(kpts)
+        return kpts.float(), self.cl
     
 
 class OpticalFlowDataset(Dataset):
@@ -207,20 +207,24 @@ def split_videos_labels_flow(config: Dict, test_size: float = 0.3) -> None:
     labels = config['labels']
     classes = config['classes']
     optical_flow = config['optical_flow']
+    kpts = config['kpts_features']
     train_ds, val_ds = [], []
     for cl_id, cl in enumerate(classes):
         v_dir = f"{root}/{cl}/{videos}"
         l_dir = f"{root}/{cl}/{labels}"
         f_dir = f"{root}/{cl}/{optical_flow}"
+        k_dir = f"{root}/{cl}/{kpts}"
         videos_list = sorted(os.listdir(v_dir))
         labels_list = sorted(os.listdir(l_dir))
         flow_list = sorted(os.listdir(f_dir))
+        kpts_list = sorted(os.listdir(k_dir))
         train_videos, val_videos, train_labels, val_labels, \
-        train_flows, val_flows = train_test_split(videos_list, labels_list, flow_list, test_size=test_size)
-        train_ds.extend({'video': vid, 'label': label, 'flow': flow, 'class': cl_id}
-                         for vid, label, flow in zip(train_videos, train_labels, train_flows))
-        val_ds.extend({'video': vid, 'label': label, 'flow': flow, 'class': cl_id}
-                         for vid, label, flow in zip(val_videos, val_labels, val_flows))
+        train_flows, val_flows, train_kpts, val_kpts \
+        = train_test_split(videos_list, labels_list, flow_list, kpts_list, test_size=test_size)
+        train_ds.extend({'video': vid, 'label': label, 'flow': flow, 'kpts_f': kpt, 'class': cl_id}
+                         for vid, label, flow, kpt in zip(train_videos, train_labels, train_flows, train_kpts))
+        val_ds.extend({'video': vid, 'label': label, 'flow': flow, 'kpts_f': kpt, 'class': cl_id}
+                         for vid, label, flow, kpt in zip(val_videos, val_labels, val_flows, val_kpts))
 
     with open("/home/cv-worker/dmitrii/rat_action_recognition/train_split.json", 'w') as f:
         json.dump(train_ds, f)
@@ -298,10 +302,26 @@ def build_conv2d_dataset(config: Dict, train_json: str, val_json: str, input_sha
     return ConcatDataset(train_ds), ConcatDataset(val_ds)
 
 
-def build_lstm_dataset(config: Dict) -> Tuple[ConcatDataset, ConcatDataset]:
-    train_ds = ConcatDataset([LSTMDataset(config, 'train', cl) for cl in config['classes']])
-    val_ds = ConcatDataset([LSTMDataset(config, 'val', cl) for cl in config['classes']])
-    return train_ds, val_ds
+def build_lstm_dataset(config: Dict, train_json: str, val_json: str, seq_length: int = 32, overlap: float = 0.2, 
+                       offset: int = 0) -> Tuple[ConcatDataset, ConcatDataset]:
+    root = config['root']
+    kpts = config['kpts_features']
+    classes = config['classes']
+    with open(train_json, 'r') as f:
+        train_meta = json.load(f)
+    with open(val_json, 'r') as f:
+        val_meta = json.load(f)
+
+    train_ds = [LSTMDataset(f"{root}/{classes[meta['class']]}/{kpts}/{meta['flow']}", 
+                              meta['class'], seq_length, overlap, offset) 
+                         for meta in train_meta]
+    
+    val_ds = [LSTMDataset(f"{root}/{classes[meta['class']]}/{kpts}/{meta['flow']}",  
+                              meta['class'], seq_length, overlap, offset) 
+                         for meta in val_meta]
+    
+    return ConcatDataset(train_ds), ConcatDataset(val_ds)
+    
 
 
 def build_two_stream_dataset(config: Dict, train_json: str, val_json: str, input_shape: Tuple[int, int], 

@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
-from typing import Optional
+from typing import Optional, Literal
 from .conv2d_classifiers import resnet34, resnet50, resnet101
 from .torch_utils import state_dict_intersection
 from torchsummary import summary
@@ -26,8 +26,8 @@ class TwoStreamCNNFusionClf(nn.Module):
 
 
 class TwoStreamCNNFusionConv(nn.Module):
-    def __init__(self, of_seq_length: int, n_classes: int, 
-                 rgb_weights: Optional[str] = None, of_weights: Optional[str] = None) -> None:
+    def __init__(self, of_seq_length: int, n_classes: int, fusion_type: Literal['mul', 'sum', 'conv'],
+                 rgb_weights: Optional[str] = None, of_weights: Optional[str] = None,) -> None:
         super().__init__()
         # Build stream models
         self.rgb_stream = resnet50(num_classes=n_classes, in_channels=3, include_top=False)
@@ -44,7 +44,9 @@ class TwoStreamCNNFusionConv(nn.Module):
             param.requires_grad_(False)
         
         # Define fusing convs
-        self.fusing_conv = nn.Conv2d(2048*2, 2048, 1, bias=False)
+        self.fusion_type = fusion_type
+        if fusion_type == 'conv':
+            self.fusing_conv = nn.Conv2d(2048*2, 2048, 1, bias=False)
         self.relu = nn.ReLU(inplace=True)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(2048, n_classes)
@@ -52,7 +54,12 @@ class TwoStreamCNNFusionConv(nn.Module):
     def forward(self, frame, of_frames):
         rgb_fmap = self.rgb_stream(frame)
         of_fmap = self.of_stream(of_frames)
-        x = self.fusing_conv(torch.cat((rgb_fmap, of_fmap), dim=1))
+        if self.fusion_type == 'conv':
+            x = self.fusing_conv(torch.cat((rgb_fmap, of_fmap), dim=1))
+        elif self.fusion_type == 'mul':
+            x = rgb_fmap * of_fmap
+        elif self.fusion_type == 'sum':
+            x = rgb_fmap + of_fmap
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
         x = self.fc(x)

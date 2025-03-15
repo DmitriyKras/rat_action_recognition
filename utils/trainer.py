@@ -23,11 +23,11 @@ class ClassificationTrainer:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # get cuda device
         self.model = model.to(self.device)
 
-    def __prepare_data(self, batch: int) -> None:
+    def prepare_data(self, batch: int) -> None:
         self.train_dl = DataLoader(self.train_ds, batch_size=batch, shuffle=True, num_workers=8)
         self.val_dl = DataLoader(self.val_ds, batch_size=batch * 2, shuffle=False, num_workers=4)
 
-    def __prepare_for_train(self, lr: float) -> None:
+    def prepare_for_train(self, lr: float) -> None:
         self.optimizer = Adam(self.model.parameters(), lr=lr)
         self.scheduler = ExponentialLR(self.optimizer, gamma=0.9)
         self.train_loss = nn.CrossEntropyLoss()
@@ -35,7 +35,7 @@ class ClassificationTrainer:
         self.recall = Recall(num_classes=self.n_classes, task='multiclass', average='macro').to(self.device)
         self.ap = AveragePrecision(num_classes=self.n_classes, task='multiclass', average='macro').to(self.device)
         self.acc = Accuracy(num_classes=self.n_classes, task='multiclass', average='micro').to(self.device)
-        self.es = EarlyStopping(5)
+        self.es = EarlyStopping(10)
 
     def save_weights(self, path: str = './') -> None:
         torch.save(self.model.state_dict(), f"{path}/best_{self.name}.pt")
@@ -74,8 +74,8 @@ class ClassificationTrainer:
         print(f"Mean recall {rec.mean()}")
 
     def train(self, batch: int, epochs: int, lr: float = 10e-4) -> None:
-        self.__prepare_data(batch)
-        self.__prepare_for_train(lr)
+        self.prepare_data(batch)
+        self.prepare_for_train(lr)
 
         train_steps = ceil(len(self.train_ds) / batch)  # number of train steps
 
@@ -140,8 +140,8 @@ class TwoStreamClassificationTrainer(ClassificationTrainer):
         super().__init__(config, model, datasets, name)
     
     def train(self, batch, epochs, lr = 0.001):
-        self.__prepare_data(batch)
-        self.__prepare_for_train(lr)
+        self.prepare_data(batch)
+        self.prepare_for_train(lr)
 
         train_steps = ceil(len(self.train_ds) / batch)  # number of train steps
 
@@ -234,4 +234,3 @@ Accuracy {self.acc.compute():.4f} mAP: {total_ap:.4f}\n""")
         print(f"Mean precision {prec.mean()}")
         [print(f"Recall for class {self.config['classes'][i]} {rec[i]}") for i in range(len(self.config['classes']))]
         print(f"Mean recall {rec.mean()}")
-        

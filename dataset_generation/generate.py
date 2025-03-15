@@ -99,46 +99,6 @@ class AutoLabelActions:
                 with open(f"{root}/{cl}/{labels_path}/{video.replace('.mp4', '.txt')}", 'w') as f:
                     f.writelines(out)
 
-    def label_img_features(self) -> None:
-        preprocess = transforms.Compose([
-                                transforms.ToTensor(),
-                                transforms.Resize([224, 224]),
-                                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
-        resnet = models.resnet18(pretrained=True)
-        modules = list(resnet.children())[:-1]      # delete the last fc layer.
-        feature_extractor = nn.Sequential(*modules).cuda()
-        feature_extractor.eval()
-        root = self.ds_config['root']
-        videos_path = self.ds_config['videos']
-        labels_path = self.ds_config['labels']
-        classes = self.ds_config['classes']
-        for cl in tqdm(classes, total=len(classes)):
-            videos = os.listdir(f"{root}/{cl}/{videos_path}")
-            os.makedirs(f"{root}/{cl}/img_features", exist_ok=True)  # make dir for labels
-            for video in tqdm(videos, total=len(videos)):
-                out = []  # output list with string labels
-                cap = cv2.VideoCapture(f"{root}/{cl}/{videos_path}/{video}")
-                label, (W, H) = read_label(f"{root}/{cl}/{labels_path}/{video.replace('.mp4', '.txt')}")
-                label = label[:, 1:5] * np.array((W, H) * 2)
-                label = label.astype(int)
-                for box in label:
-                    x1, y1, x2, y2 = box
-                    w, h = x2 - x1, y2 - y1
-                    x1 = max(0, int(x1 - w*0.15))
-                    x2 = min(W, int(x2 + w*0.15))
-                    y1 = max(0, int(y1 - h*0.15))
-                    y2 = min(H, int(y2 + h*0.15))
-                    _, frame = cap.read()  # read frame
-                    frame = frame[y1:y2, x1:x2, ::-1]  # extract roi
-                    ### EXTRACT FEATURES ###
-                    frame = preprocess(frame.copy())[None, ...].cuda()
-                    with torch.no_grad():
-                        feat = feature_extractor(frame).cpu().numpy().squeeze()
-                    out_string = ' '.join(np.round(feat, 5).astype(str).tolist()) + '\n'
-                    out.append(out_string)
-                with open(f"{root}/{cl}/img_features/{video.replace('.mp4', '.txt')}", 'w') as f:
-                    f.writelines(out)
-
     def label_flow_farneback(self, of_params: Dict, flow_shape: Tuple[int, int], 
                              crop_bbox: bool = True) -> None:
         root = self.ds_config['root']
@@ -172,62 +132,20 @@ class AutoLabelActions:
                         out = fg.step(frame)
                 np.save(f"{root}/{cl}/{of_path}/{video.replace('.mp4', '.npy')}", out.round(2).transpose((2, 0, 1)))
 
-
-class DatasetGeneratorLSTM:
-    def __init__(self, config: Dict):
-        self.ds_config = config
-        self.n_kpts = len(config['kpts'])
-        self.selected_ids = config['selected_ids']
-        self.angle_pairs = config['angle_pairs']
-        self.features = config['features']
-        self.feature_generator = FeatureGenerator(config)
-    
-    def generate_lstm_dataset(self, w_size: int, save_folder: str, overlap: float = 0.3) -> None:
+    def label_bbox_kpts_features(self) -> None:
+        root = self.ds_config['root']
         labels_path = self.ds_config['labels']
-        class_names = self.ds_config['classes']
-        root_path = self.ds_config['root']
-        img_features = self.ds_config['img_features']
-        os.makedirs(f"{root_path}/{save_folder}", exist_ok=True)  # create dirs for dataset
-        os.makedirs(f"{root_path}/{save_folder}/train", exist_ok=True)
-        os.makedirs(f"{root_path}/{save_folder}/val", exist_ok=True)
-        for id, cl in tqdm(enumerate(class_names), total=len(class_names)):
-            label_list = sorted(os.listdir(f"{root_path}/{cl}/{labels_path}/"))  # get txt paths of saved labels
-            feature_list = sorted(os.listdir(f"{root_path}/{cl}/{img_features}/"))  # get txt paths of saved img features
-            train_labels, val_labels, train_feature_list, val_feature_list = train_test_split(label_list, feature_list, test_size=0.2)
-            data = []
-            for l_path, f_path in tqdm(zip(train_labels, train_feature_list), total=len(label_list)):
-                label, _ = read_label(f"{root_path}/{cl}/{labels_path}/{l_path}")  # read label as np.ndarray
-                label = labels2kpts(label, self.n_kpts, 'bbox' in self.features)  # strip frame number and kpts scores
-                if self.ds_config['crop_features']:
-                    img_f = read_feature(f"{root_path}/{cl}/{img_features}/{f_path}")  # read features as np.ndarray
-                n_frames = label.shape[0]  # total number of frames
-                step = floor((1 - overlap) * w_size)  # step of the sliding window
-                n_steps = (n_frames - w_size) // step  + 1  # number of steps for label
-                for i in range(n_steps):
-                    f_vector = self.feature_generator.build_feature_matrix(label[i * step : i * step + w_size].copy())  # build f vector from kpts
-                    if self.ds_config['crop_features']:
-                        f_vector = np.concatenate((f_vector,
-                                                   img_f[i * step : i * step + w_size].copy()), axis=1)
-                    f_vector = np.concatenate((f_vector, np.ones((f_vector.shape[0], 1)) * id), axis=1)
-                    data.append(np.round(f_vector, 4))
-
-            data = np.array(data)
-            np.save(f"{root_path}/{save_folder}/train/{cl}.npy", data)
-            data = []
-            for l_path, f_path in tqdm(zip(val_labels, val_feature_list), total=len(label_list)):
-                label, _ = read_label(f"{root_path}/{cl}/{labels_path}/{l_path}")  # read label as np.ndarray
-                label = labels2kpts(label, self.n_kpts, 'bbox' in self.features)  # strip frame number and kpts scores
-                if self.ds_config['crop_features']:
-                    img_f = read_feature(f"{root_path}/{cl}/{img_features}/{f_path}")  # read features as np.ndarray
-                n_frames = label.shape[0]  # total number of frames
-                step = floor((1 - overlap) * w_size)  # step of the sliding window
-                n_steps = (n_frames - w_size) // step  + 1  # number of steps for label
-                for i in range(n_steps):
-                    f_vector = self.feature_generator.build_feature_matrix(label[i * step : i * step + w_size].copy())  # build f vector from kpts
-                    if self.ds_config['crop_features']:
-                        f_vector = np.concatenate((f_vector,
-                                                   img_f[i * step : i * step + w_size].copy()), axis=1)
-                    f_vector = np.concatenate((f_vector, np.ones((f_vector.shape[0], 1)) * id), axis=1)
-                    data.append(np.round(f_vector, 4))
-            np.save(f"{root_path}/{save_folder}/val/{cl}.npy", data)
-    
+        classes = self.ds_config['classes']
+        kpts_path = self.ds_config['kpts_features']
+        n_kpts = len(self.ds_config['kpts'])
+        features = self.ds_config['features']
+        feature_generator = FeatureGenerator(self.ds_config)
+        for cl in tqdm(classes, total=len(classes)):
+            labels = sorted(os.listdir(f"{root}/{cl}/{labels_path}"))
+            os.makedirs(f"{root}/{cl}/{kpts_path}", exist_ok=True)
+            for label in tqdm(labels, total=len(labels)):
+                bbox_kpts, _ = read_label(f"{root}/{cl}/{labels_path}/{label}")
+                bbox_kpts = labels2kpts(bbox_kpts, n_kpts, 'bbox' in features)  # strip frame number and kpts scores
+                f_matrix = feature_generator.build_feature_matrix(bbox_kpts)
+                np.save(f"{root}/{cl}/{kpts_path}/{label.replace('.txt', '.npy')}", f_matrix)
+                

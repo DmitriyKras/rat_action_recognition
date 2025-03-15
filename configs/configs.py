@@ -9,12 +9,11 @@ TOPVIEWRODENTS_CONFIG = {'name': 'TopViewRodents', 'kpts': {'nose': 0, 'right_ea
                         'videos': 'videos', 
                         'labels': 'labels_topviewrodents',
                         'optical_flow': 'optical_flow',
+                        'kpts_features': 'kpts_features',
                         'classes': ['on_back_paws', 'body_cleaning', 'scratching_back_paw', 'grooming'],
                         'selected_ids': TOPVIEWRODENTS_SPINE_KPTS, 
                         'features': ['position', 'bbox', 'angles', 'distance', 'speed'],
                         #'features': ['position', 'distance'],
-                        'angle_pairs': TOPVIEWRODENTS_SPINE_ANGLES,
-                        'crop_features': False,
-                        'img_features': 'img_features'}
+                        'angle_pairs': TOPVIEWRODENTS_SPINE_ANGLES}
 
 W_SIZE = 16
