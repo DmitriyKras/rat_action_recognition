@@ -16,7 +16,8 @@ train_ds, val_ds = build_conv2d_dataset(ds_config,
                                         TRAIN_JSON,
                                         VAL_JSON,
                                         input_shape=(256, 256),
-                                        offset=10)
+                                        offset=10,
+                                        step=7)
 
 
 model = resnet50(num_classes=len(ds_config['classes']), in_channels=3)

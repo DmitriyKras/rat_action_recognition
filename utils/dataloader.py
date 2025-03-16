@@ -278,7 +278,7 @@ def build_flow_dataset(config: Dict, train_json: str, val_json: str, seq_length:
 
 
 def build_conv2d_dataset(config: Dict, train_json: str, val_json: str, input_shape: Tuple[int, int],
-                         offset: int = 0) -> Tuple[ConcatDataset, ConcatDataset]:
+                         offset: int = 0, step: int = 5) -> Tuple[ConcatDataset, ConcatDataset]:
     root = config['root']
     videos = config['videos']
     labels = config['labels']
@@ -291,12 +291,12 @@ def build_conv2d_dataset(config: Dict, train_json: str, val_json: str, input_sha
 
     train_ds = [Conv2DDataset(f"{root}/{classes[meta['class']]}/{videos}/{meta['video']}", 
                               f"{root}/{classes[meta['class']]}/{labels}/{meta['label']}", 
-                              input_shape, meta['class'], offset) 
+                              input_shape, meta['class'], offset, step) 
                          for meta in train_meta]
     
     val_ds = [Conv2DDataset(f"{root}/{classes[meta['class']]}/{videos}/{meta['video']}", 
                               f"{root}/{classes[meta['class']]}/{labels}/{meta['label']}", 
-                              input_shape, meta['class'], offset) 
+                              input_shape, meta['class'], offset, step) 
                          for meta in val_meta]
     
     return ConcatDataset(train_ds), ConcatDataset(val_ds)
@@ -312,11 +312,11 @@ def build_lstm_dataset(config: Dict, train_json: str, val_json: str, seq_length:
     with open(val_json, 'r') as f:
         val_meta = json.load(f)
 
-    train_ds = [LSTMDataset(f"{root}/{classes[meta['class']]}/{kpts}/{meta['flow']}", 
+    train_ds = [LSTMDataset(f"{root}/{classes[meta['class']]}/{kpts}/{meta['kpts_f']}", 
                               meta['class'], seq_length, overlap, offset) 
                          for meta in train_meta]
     
-    val_ds = [LSTMDataset(f"{root}/{classes[meta['class']]}/{kpts}/{meta['flow']}",  
+    val_ds = [LSTMDataset(f"{root}/{classes[meta['class']]}/{kpts}/{meta['kpts_f']}",  
                               meta['class'], seq_length, overlap, offset) 
                          for meta in val_meta]
     

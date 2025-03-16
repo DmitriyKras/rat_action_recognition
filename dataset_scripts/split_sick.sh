@@ -23,4 +23,9 @@ do
     do
         mv "$vid" "$path/$cl/labels_ratpose_sick/"
     done
+
+    for vid in $(ls "$path/$cl/kpts_features/"*sick*)
+    do
+        mv "$vid" "$path/$cl/kpts_features_sick/"
+    done
 done

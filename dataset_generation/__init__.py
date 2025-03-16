@@ -1,1 +1,1 @@
-from .generate import DatasetGenerator, AutoLabelActions, DatasetGeneratorLSTM
+from .generate import DatasetGenerator, AutoLabelActions

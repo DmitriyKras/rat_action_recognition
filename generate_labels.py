@@ -1,4 +1,4 @@
-from dataset_generation import AutoLabelActions, DatasetGeneratorLSTM
+from dataset_generation import AutoLabelActions
 from configs import TOPVIEWRODENTS_CONFIG
 import time
 

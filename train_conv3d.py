@@ -15,7 +15,7 @@ VAL_JSON = '/home/cv-worker/dmitrii/rat_action_recognition/val_split.json'
 train_ds, val_ds = build_conv3d_dataset(ds_config, TRAIN_JSON, VAL_JSON,
                                         input_shape=(256, 256), 
                                         w_size=32, 
-                                        overlap=0.2, 
+                                        overlap=0.5, 
                                         offset=10)
 
 

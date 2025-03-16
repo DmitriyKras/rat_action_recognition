@@ -15,7 +15,7 @@ VAL_JSON = '/home/cv-worker/dmitrii/rat_action_recognition/val_split.json'
 
 
 train_ds, val_ds = build_two_stream_dataset(ds_config, TRAIN_JSON, VAL_JSON, input_shape=(256, 256),
-                                   step=10, seq_length=SEQ_LENGTH, offset=10)
+                                   step=7, seq_length=SEQ_LENGTH, offset=10)
 two_stream_model = TwoStreamCNNFusionConv(SEQ_LENGTH, len(ds_config['classes']), 
                                           'conv', RGB_WEIGHTS, FLOW_WEIGHTS)
 
