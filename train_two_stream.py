@@ -12,12 +12,13 @@ RGB_WEIGHTS = '/home/cv-worker/dmitrii/weights/action_recognition/best_img_resne
 FLOW_WEIGHTS = '/home/cv-worker/dmitrii/weights/action_recognition/best_flow_resnet_50.pt'
 TRAIN_JSON = '/home/cv-worker/dmitrii/rat_action_recognition/train_split.json'
 VAL_JSON = '/home/cv-worker/dmitrii/rat_action_recognition/val_split.json'
+FUSION = 'conv'
 
 
 train_ds, val_ds = build_two_stream_dataset(ds_config, TRAIN_JSON, VAL_JSON, input_shape=(256, 256),
                                    step=7, seq_length=SEQ_LENGTH, offset=10)
 two_stream_model = TwoStreamCNNFusionConv(SEQ_LENGTH, len(ds_config['classes']), 
-                                          'conv', RGB_WEIGHTS, FLOW_WEIGHTS)
+                                          FUSION, RGB_WEIGHTS, FLOW_WEIGHTS)
 
-trainer = TwoStreamClassificationTrainer(ds_config, two_stream_model, (train_ds, val_ds))
+trainer = TwoStreamClassificationTrainer(ds_config, two_stream_model, (train_ds, val_ds), f"two_stream_{FUSION}")
 trainer.train(BATCH_SIZE, EPOCHS, LR)

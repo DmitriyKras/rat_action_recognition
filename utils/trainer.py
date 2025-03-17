@@ -40,12 +40,13 @@ class ClassificationTrainer:
     def save_weights(self, path: str = './') -> None:
         torch.save(self.model.state_dict(), f"{path}/best_{self.name}.pt")
 
-    def validate(self, path: str = './') -> None:
+    def validate(self, batch: int) -> None:
+        self.prepare_data(batch)
         ma = MulticlassAccuracy(num_classes=self.n_classes, average=None).to(self.device)
         m_ap = MulticlassAUPRC(num_classes=self.n_classes, average=None).to(self.device)
         mp = MulticlassPrecision(num_classes=self.n_classes, average=None).to(self.device)
         mr = MulticlassRecall(num_classes=self.n_classes, average=None).to(self.device)
-        self.model.load_state_dict(torch.load(f"{path}/best_{self.name}.pt"))
+        #self.model.load_state_dict(torch.load(f"{path}/best_{self.name}.pt"))
 
         with torch.no_grad():
             self.model.eval()
@@ -131,7 +132,7 @@ Accuracy {self.acc.compute():.4f} mAP: {total_ap:.4f}\n""")
             if self.es.step(total_ap):  # check early stopping
                 print(f'Activating early stopping callback at epoch {epoch}')
                 break
-        self.validate()
+        self.validate(batch)
 
 
 class TwoStreamClassificationTrainer(ClassificationTrainer):
@@ -199,14 +200,15 @@ Accuracy {self.acc.compute():.4f} mAP: {total_ap:.4f}\n""")
             if self.es.step(total_ap):  # check early stopping
                 print(f'Activating early stopping callback at epoch {epoch}')
                 break
-        self.validate()
+        self.validate(batch)
 
-    def validate(self, path: str = './') -> None:
+    def validate(self, batch: int) -> None:
+        self.prepare_data(batch)
         ma = MulticlassAccuracy(num_classes=self.n_classes, average=None).to(self.device)
         m_ap = MulticlassAUPRC(num_classes=self.n_classes, average=None).to(self.device)
         mp = MulticlassPrecision(num_classes=self.n_classes, average=None).to(self.device)
         mr = MulticlassRecall(num_classes=self.n_classes, average=None).to(self.device)
-        self.model.load_state_dict(torch.load(f"{path}/best_{self.name}.pt"))
+        #self.model.load_state_dict(torch.load(f"{path}/best_{self.name}.pt"))
 
         with torch.no_grad():
             self.model.eval()
