@@ -33,31 +33,31 @@ res = []
 
 # TopViewRodents spine
 ds_config = TOPVIEWRODENTS_CONFIG
-res.append(train_val_lstm('lstm_tvr_spine'), ds_config)
+res.append(train_val_lstm('lstm_tvr_spine', ds_config))
 
 # TopViewRodents spine and ears
 ds_config['selected_ids'] = TOPVIEWRODENTS_SPINE_EARS_KPTS
 ds_config['angle_pairs'] = TOPVIEWRODENTS_SPINE_EARS_ANGLES
-res.append(train_val_lstm('lstm_tvr_spine_ears'), ds_config)
+res.append(train_val_lstm('lstm_tvr_spine_ears', ds_config))
 
 # TopViewRodents all
 ds_config['selected_ids'] = TOPVIEWRODENTS_ALL_KPTS
 ds_config['angle_pairs'] = TOPVIEWRODENTS_ALL_ANGLES
-res.append(train_val_lstm('lstm_tvr_all'), ds_config)
+res.append(train_val_lstm('lstm_tvr_all', ds_config))
 
 # WistarRat spine
 ds_config = WISTAR_RAT_CONFIG
-res.append(train_val_lstm('lstm_wistar_spine'), ds_config)
+res.append(train_val_lstm('lstm_wistar_spine', ds_config))
 
 # WistarRat spine, ears and eyes
 ds_config['selected_ids'] = WISTAR_RAT_SPINE_HEAD_KPTS
 ds_config['angle_pairs'] = WISTAR_RAT_SPINE_HEAD_ANGLES
-res.append(train_val_lstm('lstm_wistar_spine_head'), ds_config)
+res.append(train_val_lstm('lstm_wistar_spine_head', ds_config))
 
 # WistarRat all
 ds_config['selected_ids'] = WISTAR_RAT_ALL_KPTS
 ds_config['angle_pairs'] = WISTAR_RAT_ALL_ANGLES
-res.append(train_val_lstm('lstm_wistar_all'), ds_config)
+res.append(train_val_lstm('lstm_wistar_all', ds_config))
 
 
 res = pd.concat(res, axis=0)
