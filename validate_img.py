@@ -65,14 +65,14 @@ train_ds, val_ds = build_two_stream_dataset(ds_config, TRAIN_JSON, VAL_JSON, inp
 model = TwoStreamCNNFusionConv(SEQ_LENGTH, len(ds_config['classes']), 'conv')
 model.load_state_dict(torch.load('/home/cv-worker/dmitrii/weights/action_recognition/best_two_stream_conv.pt'))
 
-trainer = ClassificationTrainer(ds_config, model, (train_ds, val_ds), name='two_stream_conv')
+trainer = TwoStreamClassificationTrainer(ds_config, model, (train_ds, val_ds), name='two_stream_conv')
 res.append(trainer.validate(BATCH_SIZE))
 
 
 model = TwoStreamCNNFusionConv(SEQ_LENGTH, len(ds_config['classes']), 'mul')
 model.load_state_dict(torch.load('/home/cv-worker/dmitrii/weights/action_recognition/best_two_stream_mul.pt'))
 
-trainer = ClassificationTrainer(ds_config, model, (train_ds, val_ds), name='two_stream_mul')
+trainer = TwoStreamClassificationTrainer(ds_config, model, (train_ds, val_ds), name='two_stream_mul')
 res.append(trainer.validate(BATCH_SIZE))
 
 

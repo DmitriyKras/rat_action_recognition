@@ -62,10 +62,10 @@ class ClassificationTrainer:
                     mr.update(y_pred, y_val)
                     time.sleep(0.1)
 
-        acc = ma.compute()
-        ap = m_ap.compute()
-        prec = mp.compute()
-        rec = mr.compute()
+        acc = ma.compute().cpu().numpy()
+        ap = m_ap.compute().cpu().numpy()
+        prec = mp.compute().cpu().numpy()
+        rec = mr.compute().cpu().numpy()
         df = {'model': [self.name,]}
         df.update({self.config['classes'][i]: [ap[i],] for i in range(len(self.config['classes']))})
         df['mAP'] = [ap.mean(),]
@@ -78,6 +78,10 @@ class ClassificationTrainer:
         print(f"Mean precision {prec.mean()}")
         [print(f"Recall for class {self.config['classes'][i]} {rec[i]}") for i in range(len(self.config['classes']))]
         print(f"Mean recall {rec.mean()}")
+        df = {'model': [self.name,]}
+        df.update({self.config['classes'][i]: [ap[i],] for i in range(len(self.config['classes']))})
+        df['mAP'] = [ap.mean(),]
+        df = pd.DataFrame.from_dict(df)
         return df
 
     def train(self, batch: int, epochs: int, lr: float = 10e-4) -> pd.DataFrame:
@@ -230,10 +234,10 @@ Accuracy {self.acc.compute():.4f} mAP: {total_ap:.4f}\n""")
                     mr.update(y_pred, y_val)
                     time.sleep(0.1)
 
-        acc = ma.compute()
-        ap = m_ap.compute()
-        prec = mp.compute()
-        rec = mr.compute()
+        acc = ma.compute().cpu().numpy()
+        ap = m_ap.compute().cpu().numpy()
+        prec = mp.compute().cpu().numpy()
+        rec = mr.compute().cpu().numpy()
         [print(f"Accuracy for class {self.config['classes'][i]} {acc[i]}") for i in range(len(self.config['classes']))]
         print(f"Mean accuracy {acc.mean()}")
         [print(f"Average Precision for class {self.config['classes'][i]} {ap[i]}") for i in range(len(self.config['classes']))]
