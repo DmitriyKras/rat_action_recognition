@@ -7,7 +7,7 @@ TOPVIEWRODENTS_SPINE_EARS_ANGLES = [[1, 0], [2, 0], [3, 0], [3, 1], [3, 2],  # h
 
 TOPVIEWRODENTS_ALL_KPTS = [0, 1, 2, 3, 4, 5, 6, 7]
 TOPVIEWRODENTS_ALL_ANGLES = [[1, 0], [2, 0], [3, 0], [3, 1], [3, 2],  # head orientation
-                             [4, 3], [7, 0], [7, 3], [5, 3], [6, 3]  # body orientation
+                             [4, 3], [7, 0], [7, 3], [5, 3], [6, 3],  # body orientation
                              [7, 4], [7, 5], [7, 6]]  # hips orientation
 
 TOPVIEWRODENTS_CONFIG = {'name': 'TopViewRodents', 'kpts': {'nose': 0, 'right_ear': 1, 'left_ear': 2, 'neck': 3, 'center': 4,

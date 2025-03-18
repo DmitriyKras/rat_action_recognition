@@ -7,6 +7,7 @@ from tqdm import tqdm
 import time
 from math import ceil
 from torchmetrics import Precision, Recall, AveragePrecision, Accuracy
+import pandas as pd
 from .callbacks import EarlyStopping 
 from typing import Tuple, Dict
 from torcheval.metrics import MulticlassAccuracy, MulticlassAUPRC, MulticlassPrecision, MulticlassRecall
@@ -40,7 +41,7 @@ class ClassificationTrainer:
     def save_weights(self, path: str = './') -> None:
         torch.save(self.model.state_dict(), f"{path}/best_{self.name}.pt")
 
-    def validate(self, batch: int) -> None:
+    def validate(self, batch: int) -> pd.DataFrame:
         self.prepare_data(batch)
         ma = MulticlassAccuracy(num_classes=self.n_classes, average=None).to(self.device)
         m_ap = MulticlassAUPRC(num_classes=self.n_classes, average=None).to(self.device)
@@ -65,6 +66,10 @@ class ClassificationTrainer:
         ap = m_ap.compute()
         prec = mp.compute()
         rec = mr.compute()
+        df = {'model': [self.name,]}
+        df.update({self.config['classes'][i]: [ap[i],] for i in range(len(self.config['classes']))})
+        df['mAP'] = [ap.mean(),]
+        df = pd.DataFrame.from_dict(df)
         [print(f"Accuracy for class {self.config['classes'][i]} {acc[i]}") for i in range(len(self.config['classes']))]
         print(f"Mean accuracy {acc.mean()}")
         [print(f"Average Precision for class {self.config['classes'][i]} {ap[i]}") for i in range(len(self.config['classes']))]
@@ -73,8 +78,9 @@ class ClassificationTrainer:
         print(f"Mean precision {prec.mean()}")
         [print(f"Recall for class {self.config['classes'][i]} {rec[i]}") for i in range(len(self.config['classes']))]
         print(f"Mean recall {rec.mean()}")
+        return df
 
-    def train(self, batch: int, epochs: int, lr: float = 10e-4) -> None:
+    def train(self, batch: int, epochs: int, lr: float = 10e-4) -> pd.DataFrame:
         self.prepare_data(batch)
         self.prepare_for_train(lr)
 
@@ -132,7 +138,7 @@ Accuracy {self.acc.compute():.4f} mAP: {total_ap:.4f}\n""")
             if self.es.step(total_ap):  # check early stopping
                 print(f'Activating early stopping callback at epoch {epoch}')
                 break
-        self.validate(batch)
+        return self.validate(batch)
 
 
 class TwoStreamClassificationTrainer(ClassificationTrainer):
@@ -140,7 +146,7 @@ class TwoStreamClassificationTrainer(ClassificationTrainer):
                  datasets: Tuple[Dataset, Dataset], name: str = 'two_stream') -> None:
         super().__init__(config, model, datasets, name)
     
-    def train(self, batch, epochs, lr = 0.001):
+    def train(self, batch, epochs, lr = 0.001) -> pd.DataFrame:
         self.prepare_data(batch)
         self.prepare_for_train(lr)
 
@@ -200,9 +206,9 @@ Accuracy {self.acc.compute():.4f} mAP: {total_ap:.4f}\n""")
             if self.es.step(total_ap):  # check early stopping
                 print(f'Activating early stopping callback at epoch {epoch}')
                 break
-        self.validate(batch)
+        return self.validate(batch)
 
-    def validate(self, batch: int) -> None:
+    def validate(self, batch: int) -> pd.DataFrame:
         self.prepare_data(batch)
         ma = MulticlassAccuracy(num_classes=self.n_classes, average=None).to(self.device)
         m_ap = MulticlassAUPRC(num_classes=self.n_classes, average=None).to(self.device)
@@ -236,3 +242,8 @@ Accuracy {self.acc.compute():.4f} mAP: {total_ap:.4f}\n""")
         print(f"Mean precision {prec.mean()}")
         [print(f"Recall for class {self.config['classes'][i]} {rec[i]}") for i in range(len(self.config['classes']))]
         print(f"Mean recall {rec.mean()}")
+        df = {'model': [self.name,]}
+        df.update({self.config['classes'][i]: [ap[i],] for i in range(len(self.config['classes']))})
+        df['mAP'] = [ap.mean(),]
+        df = pd.DataFrame.from_dict(df)
+        return df

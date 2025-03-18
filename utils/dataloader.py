@@ -19,7 +19,7 @@ class LSTMDataset(Dataset):
         super().__init__()
         self.cl = self.cl = torch.tensor(cl)
         self.data = np.load(lstm_path, mmap_mode='r')  # load npy video in mmap mode
-        n_frames = self.data.shape[0] // 2 - 2 * offset
+        n_frames = self.data.shape[0] - 2 * offset
         self.offset = offset
         self.step = floor((1 - overlap) * seq_length)  # step of the sliding window
         self.n_steps = (n_frames - seq_length) // self.step + 1 # number of steps for video
