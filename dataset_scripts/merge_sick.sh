@@ -1,5 +1,7 @@
 # declare classes
-declare -a cls=("scratching_back_paw" "body_cleaning" "grooming" "on_back_paws")
+#declare -a cls=("scratching_back_paw" "body_cleaning" "grooming" "on_back_paws")  # initial exp
+declare -a cls=("eating" "sniffing")  # bridge
+#declare -a cls=("scratching_back_paw" "body_cleaning" "grooming" "on_back_paws" "eating" "sniffing")  # target exp
 declare path="/home/cv-worker/dmitrii/RAT_DATASET/LAB_RAT_ACTIONS_DATASET"
 
 for cl in "${cls[@]}"

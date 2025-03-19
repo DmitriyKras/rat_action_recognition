@@ -5,3 +5,4 @@ lstm_dataset
 *.pkl
 *.pth
 *.ipynb
+print_res.py
