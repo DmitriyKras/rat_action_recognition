@@ -6,3 +6,5 @@ lstm_dataset
 *.pth
 *.ipynb
 print_res.py
+*.xlsx
+*.json

@@ -67,7 +67,9 @@ class ClassificationTrainer:
         prec = mp.compute().cpu().numpy()
         rec = mr.compute().cpu().numpy()
         df = {'model': [self.name,]}
-        df.update({self.config['classes'][i]: [ap[i],] for i in range(len(self.config['classes']))})
+        df.update({self.config['classes'][i] + '_ap': [ap[i],] for i in range(len(self.config['classes']))})
+        df.update({self.config['classes'][i] + '_precision': [prec[i],] for i in range(len(self.config['classes']))})
+        df.update({self.config['classes'][i] + '_recall': [rec[i],] for i in range(len(self.config['classes']))})
         df['mAP'] = [ap.mean(),]
         df = pd.DataFrame.from_dict(df)
         [print(f"Accuracy for class {self.config['classes'][i]} {acc[i]}") for i in range(len(self.config['classes']))]

@@ -6,7 +6,7 @@ from models import MultiLayerBiLSTMClassifier, LSTMClassifier
 from configs import *
 
 
-BATCH_SIZE = 128
+BATCH_SIZE = 512
 EPOCHS = 100
 LR = 10e-4
 SEQ_LENGTH = 32
